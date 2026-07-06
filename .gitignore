@@ -1,0 +1,28 @@
+
+# Playwright
+node_modules/
+
+# Environment variables — never commit secrets
+.env
+.env.local
+.env.*.local
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+# Reused auth session — contains live login state; NEVER commit
+/playwright/.auth/
+
+# Local Claude Code settings — may contain commands with credentials
+.claude/settings.local.json
+
+# Recon / scratch
+.recon/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Playwright MCP scratch snapshots
+.playwright-mcp/

@@ -1,0 +1,22 @@
+Sales Call Transcript — Customer Automation
+Date: 2026-07-06
+Attendees: Account Executive (Insight), IT Director (Customer Automation)
+
+IT Director: We're currently running our customer journey automation on an ageing
+on-prem stack and it's becoming expensive to maintain. We're evaluating a move to
+the cloud over the next two quarters.
+
+Account Executive: Understood. Are you looking primarily at infrastructure
+modernisation, or also at the application and data layers?
+
+IT Director: Both, ideally. We'd want to modernise the data platform and add some
+AI-driven analytics on top. Security and compliance are also a big concern for us
+given the industry we operate in.
+
+Account Executive: That aligns well with our portfolio. We can help with cloud
+adoption, data platform modernisation, and a security and compliance workstream.
+
+IT Director: Budget is a factor, so we'd need clear pricing and a phased approach.
+
+Account Executive: Noted — we'll put together a phased proposal with clear pricing
+tiers and identify where we can add value beyond the initial request.
