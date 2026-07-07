@@ -1,15 +1,16 @@
 name: Playwright Tests
 
-# Credentials come from repository secrets (Settings → Secrets and variables →
+# Credentials come from repository secrets (Settings > Secrets and variables >
 # Actions):
 #   AICOACH_EMAIL     - staging account email
 #   AICOACH_PASSWORD  - staging account password
 #
 # Test selection:
-#   push / pull_request / nightly  -> "smoke" (fast, non-mutating tests only)
-#   manual (workflow_dispatch)     -> choose "smoke" or "full"
+#   push / pull_request        -> "smoke" (fast, non-mutating tests only)
+#   manual (workflow_dispatch) -> choose "smoke" or "full"
+# (A nightly schedule is available but currently commented out below.)
 #
-# "full" runs the agent chat-creation tests too — these create real chats and
+# "full" runs the agent chat-creation tests too - these create real chats and
 # trigger ~2-minute AI runs on the shared staging account (and include the
 # known BID Writer backend 504), so they are intentionally kept out of the
 # per-push run.
@@ -19,8 +20,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  schedule:
-    - cron: '0 6 * * *' # 06:00 UTC nightly smoke run
+  # Nightly schedule disabled for now - re-enable by uncommenting.
+  # schedule:
+  #   - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
       suite:

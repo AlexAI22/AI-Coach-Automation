@@ -99,8 +99,8 @@ npx -p typescript tsc --noEmit
 
 CI is defined in [.github/workflows/playwright.yml](.github/workflows/playwright.yml):
 
-- **Triggers:** push to `main`, pull requests, a nightly schedule (06:00 UTC), and
-  manual `workflow_dispatch`.
+- **Triggers:** push to `main`, pull requests, and manual `workflow_dispatch`
+  (a nightly schedule is included but currently commented out).
 - **Runtime:** Ubuntu + bundled **Chromium**, headless. `CI=true` enables 2 retries
   and single-worker mode (shared staging account).
 - **Suites:**
