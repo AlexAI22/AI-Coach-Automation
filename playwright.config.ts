@@ -1,20 +1,61 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
+ * Runtime configuration via environment variables — nothing sensitive lives in
+ * the repo, and no .env loader is used. Set them in your shell before running,
+ * e.g. (PowerShell):
+ *
+ *   $env:BROWSER="chrome"; $env:HEADLESS="false"; `
+ *   $env:EMAIL="you@insight.com"; $env:PASSWORD="<secret>"; `
+ *   npm run test:sales-coach
+ *
+ *  - BROWSER  : chrome (default) | chromium | edge | firefox | webkit
+ *  - HEADLESS : true (default) | false
+ *  - EMAIL    : login email
+ *  - PASSWORD : login password (pass it in the command; or use
+ *               `npm run test:sales-coach:secure` for a hidden prompt)
  */
-import dotenv from 'dotenv';
-import path from 'path';
-// `quiet: true` suppresses dotenv's runtime logging so credentials/env tips
-// are never echoed to the console while the suite runs.
-dotenv.config({ path: path.resolve(__dirname, '.env'), quiet: true });
+const browserKey = (process.env.BROWSER ?? 'chrome').toLowerCase();
+const headless = (process.env.HEADLESS ?? 'true').toLowerCase() !== 'false';
+
+// Fix the black headed-Chrome window on Windows. The window renders black even
+// though the page is actually painted (screenshots look correct) because
+// Windows' native occlusion detection marks the window "occluded" and Chrome
+// stops compositing it. Disabling CalculateNativeWinOcclusion (and backgrounding
+// of occluded windows) keeps it painting; `--disable-gpu` covers GPU-compositing
+// failures too. NOTE: do NOT add `--disable-software-rasterizer` — that removes
+// the software fallback and leaves the window blank.
+const CHROMIUM_LAUNCH = {
+  launchOptions: {
+    args: [
+      // Force the whole GL stack to software (SwiftShader) so the visible
+      // window composites without a working GPU, and stop Windows occlusion
+      // detection from blanking it. This fixes the black/blank headed window
+      // when the machine's GPU/driver can't composite Chrome.
+      '--use-gl=angle',
+      '--use-angle=swiftshader',
+      '--disable-features=CalculateNativeWinOcclusion',
+    ],
+  },
+};
+
+const BROWSERS: Record<string, { name: string; use: Record<string, unknown> }> = {
+  chrome: { name: 'chrome', use: { ...devices['Desktop Chrome'], channel: 'chrome', ...CHROMIUM_LAUNCH } },
+  chromium: { name: 'chromium', use: { ...devices['Desktop Chrome'], ...CHROMIUM_LAUNCH } },
+  edge: { name: 'edge', use: { ...devices['Desktop Edge'], channel: 'msedge', ...CHROMIUM_LAUNCH } },
+  firefox: { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+  webkit: { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+};
+const selectedBrowser = BROWSERS[browserKey] ?? BROWSERS.chrome;
 
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
   testDir: './tests',
+  /* Ignore scratch/recon specs (prefixed with an underscore) so they never run
+     in CI or a normal `playwright test`. */
+  testIgnore: '**/_*.spec.ts',
   /* Log in once before the run; credentialed tests reuse the saved session. */
   globalSetup: require.resolve('./global-setup'),
   /* Run tests in files in parallel */
@@ -27,6 +68,9 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
+  /* The staging backend renders content asynchronously and slowly, so give
+     web-first assertions more room than the 5s default. */
+  expect: { timeout: 20000 },
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
@@ -34,52 +78,16 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+
+    /* Headed/headless is driven by the HEADLESS env var (default headless). */
+    headless,
   },
 
-  /* Configure projects for major browsers */
+  /* Single project selected by the BROWSER env var (default real Google Chrome). */
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-
-    /* Test against mobile viewports. */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
-
-    /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-
-    /* Real Google Chrome (branded channel), not the bundled Chromium. */
-    {
-      name: 'Google Chrome',
-      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+      name: selectedBrowser.name,
+      use: selectedBrowser.use,
     },
   ],
-
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
 });

@@ -1,0 +1,82 @@
+name: Playwright Tests
+
+# Credentials come from repository secrets (Settings → Secrets and variables →
+# Actions):
+#   AICOACH_EMAIL     - staging account email
+#   AICOACH_PASSWORD  - staging account password
+#
+# Test selection:
+#   push / pull_request / nightly  -> "smoke" (fast, non-mutating tests only)
+#   manual (workflow_dispatch)     -> choose "smoke" or "full"
+#
+# "full" runs the agent chat-creation tests too — these create real chats and
+# trigger ~2-minute AI runs on the shared staging account (and include the
+# known BID Writer backend 504), so they are intentionally kept out of the
+# per-push run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * *' # 06:00 UTC nightly smoke run
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Which tests to run
+        type: choice
+        options: [smoke, full]
+        default: smoke
+
+# One run per ref; cancel superseded runs.
+concurrency:
+  group: playwright-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: E2E (${{ github.event.inputs.suite || 'smoke' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # Map repository secrets to the env vars the suite reads.
+      EMAIL: ${{ secrets.AICOACH_EMAIL }}
+      PASSWORD: ${{ secrets.AICOACH_PASSWORD }}
+      # CI-friendly runtime config (bundled Chromium, headless). CI=true also
+      # enables retries and single-worker mode in playwright.config.ts.
+      BROWSER: chromium
+      HEADLESS: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser (Chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Run tests
+        run: |
+          if [ "${{ github.event.inputs.suite }}" = "full" ]; then
+            echo "Running FULL suite"
+            npx playwright test
+          else
+            echo "Running SMOKE suite (excluding mutating chat-creation tests)"
+            npx playwright test --grep-invert "should create a"
+          fi
+
+      - name: Upload HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 14

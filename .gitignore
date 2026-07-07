@@ -2,10 +2,11 @@
 # Playwright
 node_modules/
 
-# Environment variables — never commit secrets
+# Environment variables / local credentials — never commit secrets
 .env
 .env.local
 .env.*.local
+credentials.local.json
 /test-results/
 /playwright-report/
 /blob-report/

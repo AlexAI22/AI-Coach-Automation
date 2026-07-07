@@ -6,12 +6,12 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "test:chrome": "playwright test --project=\"Google Chrome\"",
-    "test:login": "playwright test login-success.spec.ts --project=chromium",
-    "test:login:headed": "playwright test login-success.spec.ts --project=chromium --headed",
-    "test:sales-coach": "playwright test sales-coach.spec.ts --project=\"Google Chrome\" --workers=1",
-    "test:sales-coach:headed": "playwright test sales-coach.spec.ts --project=\"Google Chrome\" --workers=1 --headed",
+    "test:login": "playwright test login-success.spec.ts",
+    "test:login:headed": "playwright test login-success.spec.ts --headed",
+    "test:sales-coach": "playwright test sales-coach.spec.ts --workers=1",
+    "test:sales-coach:headed": "playwright test sales-coach.spec.ts --workers=1 --headed",
     "test:sales-coach:secure": "pwsh -NoProfile -File scripts/run-sales-coach.ps1",
+    "test:secure": "pwsh -NoProfile -File scripts/run-secure.ps1",
     "report": "playwright show-report"
   },
   "keywords": [],
@@ -21,7 +21,6 @@
   "devDependencies": {
     "@playwright/mcp": "^0.0.75",
     "@playwright/test": "^1.60.0",
-    "@types/node": "^25.7.0",
-    "dotenv": "^17.4.2"
+    "@types/node": "^25.7.0"
   }
 }

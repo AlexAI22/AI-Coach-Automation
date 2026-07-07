@@ -17,10 +17,10 @@ and a reused authentication session.
 |------|---------|
 | `@playwright/test` | Test runner, browser automation, assertions, HTML reporter |
 | `typescript` / `@types/node` | Typed test/page-object code (editor + `tsc` type-checking) |
-| `dotenv` | Loads credentials from `.env` |
 | `@playwright/mcp` | Playwright MCP server for AI-assisted authoring (see below) |
 
-Tests run on **Chromium, Firefox, and WebKit** (configurable in `playwright.config.ts`).
+The browser and headed/headless mode are chosen at runtime via the `BROWSER` and
+`HEADLESS` environment variables (see below); default is real **Google Chrome**, headless.
 
 ---
 
@@ -40,33 +40,32 @@ npm install
 
 # 2. Install Playwright browsers
 npx playwright install
-
-# 3. Configure credentials
-cp .env.example .env
-#   then edit .env with your staging account
 ```
 
-### `.env`
+### Credentials & run configuration
 
-```ini
-EMAIL=your-email@example.com
-PASSWORD="your-password"
-```
+Credentials are **not stored in the repo** — pass them as environment variables in the
+command that runs the tests. No `.env` loader is used.
 
-> **Important:** wrap the password in **double quotes** if it contains `#` or `$` —
-> in `.env` syntax an unquoted `#` starts a comment and would silently truncate the value.
-
-Credentials can also be supplied directly from the terminal (these override `.env`):
+| Variable | Values | Default |
+|----------|--------|---------|
+| `EMAIL` | staging account email | — (required) |
+| `PASSWORD` | staging account password | — (required) |
+| `BROWSER` | `chrome` \| `chromium` \| `edge` \| `firefox` \| `webkit` | `chrome` |
+| `HEADLESS` | `true` \| `false` | `true` |
 
 ```powershell
 # PowerShell
-$env:EMAIL='your-email@example.com'; $env:PASSWORD='your-password'; npm run test:sales-coach
+$env:BROWSER="chrome"; $env:EMAIL="you@insight.com"; $env:PASSWORD="your-password"; npm run test:sales-coach
 ```
 
 ```bash
 # bash / CI
-EMAIL='your-email@example.com' PASSWORD='your-password' npm run test:sales-coach
+BROWSER=chrome EMAIL='you@insight.com' PASSWORD='your-password' npm run test:sales-coach
 ```
+
+To keep the password off the command line entirely, use the hidden prompt instead
+(set `EMAIL` first): `npm run test:sales-coach:secure`.
 
 ---
 
@@ -74,23 +73,54 @@ EMAIL='your-email@example.com' PASSWORD='your-password' npm run test:sales-coach
 
 | Command | Description |
 |---------|-------------|
-| `npm test` | Full suite, all 3 browsers |
-| `npm run test:chrome` | Full suite, Chromium only |
+| `npm test` | Full suite in the `BROWSER` (default Chrome) |
 | `npm run test:headed` | Full suite with a visible browser |
-| `npm run test:login` | Login form tests (Chromium) |
+| `npm run test:login` | Login form tests |
 | `npm run test:login:headed` | Login form tests, visible browser |
-| `npm run test:sales-coach` | Authenticated Sales Coach tests (Chromium) |
+| `npm run test:sales-coach` | Authenticated Sales Coach tests (`--workers=1`) |
 | `npm run test:sales-coach:headed` | Sales Coach tests, visible browser |
+| `npm run test:sales-coach:secure` | Sales Coach tests, password entered at a hidden prompt |
 | `npm run report` | Open the last HTML report |
 
-> The staging backend is slow and all credentialed tests share one account. For a
-> reliable run, add `--workers=1` (e.g. `npm run test:chrome -- --workers=1`).
+> Prefix any command with the credential/browser env vars, e.g.
+> `$env:EMAIL="..."; $env:PASSWORD="..."; npm run test:sales-coach`.
+> The staging backend is slow and all credentialed tests share one account, so the
+> Sales Coach scripts already run with `--workers=1`.
 
 ### Type-checking
 
 ```bash
 npx -p typescript tsc --noEmit
 ```
+
+---
+
+## Continuous Integration (GitHub Actions)
+
+CI is defined in [.github/workflows/playwright.yml](.github/workflows/playwright.yml):
+
+- **Triggers:** push to `main`, pull requests, a nightly schedule (06:00 UTC), and
+  manual `workflow_dispatch`.
+- **Runtime:** Ubuntu + bundled **Chromium**, headless. `CI=true` enables 2 retries
+  and single-worker mode (shared staging account).
+- **Suites:**
+  - push / PR / nightly → **smoke** (fast, non-mutating tests only — the mutating
+    chat-creation tests are excluded via `--grep-invert "should create a"`).
+  - manual run → choose **smoke** or **full** (full also runs the ~2-minute agent
+    chat-creation tests).
+- The HTML report is uploaded as a build artifact (`playwright-report-<run_id>`).
+
+### Required repository secrets
+
+Add these under **Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+|--------|-------|
+| `AICOACH_EMAIL` | staging account email |
+| `AICOACH_PASSWORD` | staging account password |
+
+They are mapped to the `EMAIL` / `PASSWORD` environment variables the suite reads;
+credentials are never stored in the repository.
 
 ---
 
@@ -105,9 +135,10 @@ npx -p typescript tsc --noEmit
 │   ├── login-success.spec.ts  # Login form tests (logged-out)
 │   └── sales-coach.spec.ts     # Sales Coach tests (reused auth session)
 ├── global-setup.ts            # Logs in ONCE, saves the session for reuse
-├── playwright.config.ts       # Base URL, projects, reporter, global setup
+├── playwright.config.ts       # Base URL, env-driven browser/headless, reporter, global setup
 ├── tsconfig.json              # Type-checking config (Node16, strict)
-├── .env / .env.example        # EMAIL / PASSWORD
+├── scripts/run-sales-coach.ps1 # Runs Sales Coach tests with a hidden password prompt
+├── features/                  # BDD (Gherkin) specification of the flows
 └── .github/agents/            # AI agent definitions (see below)
 ```
 
@@ -132,7 +163,8 @@ The login form specs deliberately stay logged-out to test the login page itself.
 `sales-coach.spec.ts` runs with `trace: 'off'`. A Playwright trace captures network
 request bodies and DOM snapshots, both of which contain real credentials on the login
 request — disabling tracing for credentialed specs ensures no `trace.zip` / HTML-report
-artifact can embed them. The session file (`playwright/.auth/`) and `.env` are gitignored.
+artifact can embed them. The session file (`playwright/.auth/`) is gitignored, and
+credentials are passed as environment variables at runtime — never stored in the repo.
 
 ---
 
@@ -165,7 +197,7 @@ npm run report
 | Symptom | Cause / fix |
 |---------|-------------|
 | `No account found with those credentials` | Account not registered in the **staging** PropelAuth tenant, or wrong password. |
-| Password seems truncated / login fails with `#` or `$` in it | Quote the value in `.env`: `PASSWORD="..."`. |
+| Credentialed tests are skipped | `EMAIL` / `PASSWORD` env vars not set for the run — pass them in the command. |
 | `Your account has been locked for security reasons` | Too many failed logins tripped PropelAuth's lockout; reset the password or wait. |
 | `page.goto` timeout in `beforeEach` | Staging responding slowly; navigation uses `waitUntil: 'domcontentloaded'`, and re-running usually clears it. |
 | Flaky failures when running everything in parallel | Shared staging account + slow backend. Run with `--workers=1`. |
