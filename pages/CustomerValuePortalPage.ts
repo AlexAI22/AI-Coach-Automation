@@ -5,8 +5,9 @@ import { Page, Locator, expect } from '@playwright/test';
  *
  * Layout: a title/description header, a "Demo Mode" toggle and a currency
  * <select> (GBP/USD/EUR), a "Search customers by name" box, a customer table
- * (Customer / Channel / Annual Revenue / L12M ACR / Account Team columns) and
- * pagination controls with a "Showing X of Y customers" label.
+ * (Customer / Channel / MS L12M Licensing Revenue / MS L12M ACR /
+ * L12M Invoiced Total / Account Team columns) and pagination controls with a
+ * "Showing X of Y customers" label.
  *
  * Locators lean on the app's stable `data-sentry-component` hooks, matching the
  * rest of the page objects in this suite.
@@ -144,9 +145,15 @@ export class CustomerValuePortalPage {
     return name;
   }
 
-  /** The Annual Revenue cell within a given row. */
-  annualRevenueOf(row: Locator): Locator {
-    return row.locator('[data-sentry-component="AnnualRevenue"]');
+  /**
+   * The first monetary cell within a given row. The table now renders three
+   * currency columns per row (MS L12M Licensing Revenue, MS L12M ACR,
+   * L12M Invoiced Total), each a `CurrencyColumn` component; the first is the
+   * MS L12M Licensing Revenue value. Used to assert currency formatting and
+   * that the displayed symbol tracks the currency selector.
+   */
+  revenueCellOf(row: Locator): Locator {
+    return row.locator('[data-sentry-component="CurrencyColumn"]').first();
   }
 
   /** Trimmed name text of the first customer row (waits for it to render). */

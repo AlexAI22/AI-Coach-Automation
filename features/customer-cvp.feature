@@ -33,8 +33,9 @@ Feature: Customer Value Portal
     Then the customer table header should be visible
     And it should show the "Customer" column
     And it should show the "Channel" column
-    And it should show the "Annual Revenue" column
-    And it should show the "L12M ACR" column
+    And it should show the "MS L12M Licensing Revenue" column
+    And it should show the "MS L12M ACR" column
+    And it should show the "L12M Invoiced Total" column
     And it should show the "Account Team" column
 
   Scenario: List customers and match the "Showing X of Y" count
@@ -45,7 +46,7 @@ Feature: Customer Value Portal
     And the total count should be greater than or equal to the number shown
     And every row should show a customer name
     And every row should show a "Customer ID:" value
-    And every row should show an Annual Revenue formatted with a currency symbol
+    And every row should show a revenue value formatted with a currency symbol
 
   Scenario: Accept text in the customer search box
     Given I dismiss the "Welcome to AI Coach" modal if it is shown
@@ -75,11 +76,11 @@ Feature: Customer Value Portal
     Given I dismiss the "Welcome to AI Coach" modal if it is shown
     And Demo Mode is enabled so sample customers are loaded
     When I select "USD" from the currency selector
-    Then the Annual Revenue values should display the "$" symbol
+    Then the revenue values should display the "$" symbol
     When I select "GBP" from the currency selector
-    Then the Annual Revenue values should display the "£" symbol
+    Then the revenue values should display the "£" symbol
     When I select "EUR" from the currency selector
-    Then the Annual Revenue values should display the "€" symbol
+    Then the revenue values should display the "€" symbol
 
   Scenario: Expose pagination controls with the first page active
     Given I dismiss the "Welcome to AI Coach" modal if it is shown

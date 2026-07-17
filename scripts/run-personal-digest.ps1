@@ -28,7 +28,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Prompt for the password without echoing it to the terminal.
+# EMAIL is not secret; default to the staging account, or take it from the
+# environment / a prompt if you want a different one.
+if (-not $env:EMAIL) {
+  $env:EMAIL = 'alexandru.strangov@insight.com'
+}
+
+# Prompt for the password without echoing it to the terminal (masked input).
+# The password is never stored on disk or shown; it lives only in the process
+# environment for this run and is scrubbed in the finally block below.
 $secure = Read-Host 'Insight password' -AsSecureString
 $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
 try {

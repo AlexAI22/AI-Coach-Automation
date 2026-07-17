@@ -3,6 +3,7 @@ import { CustomerValuePortalPage } from '../pages/CustomerValuePortalPage';
 import { CustomerAccountPage } from '../pages/CustomerAccountPage';
 import { AUTH_FILE } from '../global-setup';
 import { watchHttpErrors } from './support/httpErrors';
+import { hasCredentials } from '../support/credentials';
 
 /**
  * Customer Value Portal (https://.../customer-value-portal).
@@ -23,8 +24,8 @@ test.describe('Customer Value Portal (reused session)', () => {
 
   test.beforeEach(async ({ page }) => {
     test.skip(
-      !process.env.EMAIL || !process.env.PASSWORD,
-      'EMAIL and PASSWORD must be set (via the environment)',
+      !hasCredentials(),
+      'Credentials must be set (AICoach_MICROSOFT_EMAIL/AICoach_MICROSOFT_PASSWORD or EMAIL/PASSWORD)',
     );
     cvp = new CustomerValuePortalPage(page);
     await cvp.goto();
@@ -48,7 +49,14 @@ test.describe('Customer Value Portal (reused session)', () => {
 
   test('should render the customer table with all column headers', async () => {
     await expect(cvp.tableHeader).toBeVisible({ timeout: 20000 });
-    for (const col of ['Customer', 'Channel', 'Annual Revenue', 'L12M ACR', 'Account Team']) {
+    for (const col of [
+      'Customer',
+      'Channel',
+      'MS L12M Licensing Revenue',
+      'MS L12M ACR',
+      'L12M Invoiced Total',
+      'Account Team',
+    ]) {
       await expect(cvp.tableHeader).toContainText(col);
     }
   });
@@ -64,13 +72,13 @@ test.describe('Customer Value Portal (reused session)', () => {
     expect(shown).toBe(rowCount);
     expect(total).toBeGreaterThanOrEqual(shown);
 
-    // Every row has a customer name, a "Customer ID:" line and an Annual Revenue
-    // value formatted as a currency amount.
+    // Every row has a customer name, a "Customer ID:" line and a revenue value
+    // formatted as a currency amount.
     for (let i = 0; i < rowCount; i++) {
       const row = cvp.rows.nth(i);
       await expect(cvp.nameOf(row)).not.toBeEmpty();
       await expect(row).toContainText(/Customer ID:\s*\d+/);
-      await expect(cvp.annualRevenueOf(row)).toContainText(/[£$€]/);
+      await expect(cvp.revenueCellOf(row)).toContainText(/[£$€]/);
     }
   });
 
@@ -118,7 +126,7 @@ test.describe('Customer Value Portal (reused session)', () => {
   test('should change the displayed currency symbol', async () => {
     await cvp.ensureCustomersLoaded();
 
-    const firstRevenue = cvp.annualRevenueOf(cvp.rows.first());
+    const firstRevenue = cvp.revenueCellOf(cvp.rows.first());
     await expect(firstRevenue).toBeVisible({ timeout: 20000 });
 
     for (const code of ['USD', 'GBP', 'EUR']) {
@@ -160,8 +168,8 @@ test.describe('Customer Value Portal — Account navigation (reused session)', (
 
   test.beforeEach(async ({ page }) => {
     test.skip(
-      !process.env.EMAIL || !process.env.PASSWORD,
-      'EMAIL and PASSWORD must be set (via the environment)',
+      !hasCredentials(),
+      'Credentials must be set (AICoach_MICROSOFT_EMAIL/AICoach_MICROSOFT_PASSWORD or EMAIL/PASSWORD)',
     );
     cvp = new CustomerValuePortalPage(page);
     account = new CustomerAccountPage(page);
@@ -203,7 +211,7 @@ for (const customer of ACCOUNTS) {
     let account: CustomerAccountPage;
 
     test.beforeAll(async ({ browser }) => {
-      if (!process.env.EMAIL || !process.env.PASSWORD) return; // tests skip below
+      if (!hasCredentials()) return; // tests skip below
       test.setTimeout(120000); // account view can need several reloads to mount
       context = await browser.newContext({ storageState: AUTH_FILE });
       const page = await context.newPage();

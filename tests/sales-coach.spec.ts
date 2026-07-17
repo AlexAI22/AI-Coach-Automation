@@ -4,6 +4,7 @@ import { SalesCoachPage } from '../pages/SalesCoachPage';
 import { DraftChatPage, type DraftChatOptions } from '../pages/DraftChatPage';
 import { AUTH_FILE } from '../global-setup';
 import { watchHttpErrors } from './support/httpErrors';
+import { hasCredentials } from '../support/credentials';
 
 /**
  * Sales Coach flows against the real staging tenant.
@@ -27,8 +28,8 @@ test.describe('Sales Coach (reused session)', () => {
 
   test.beforeEach(async ({ page }) => {
     test.skip(
-      !process.env.EMAIL || !process.env.PASSWORD,
-      'EMAIL and PASSWORD must be set (via .env or the terminal)',
+      !hasCredentials(),
+      'Credentials must be set (AICoach_MICROSOFT_EMAIL/AICoach_MICROSOFT_PASSWORD or EMAIL/PASSWORD)',
     );
     salesCoach = new SalesCoachPage(page);
     // Reused auth session — land directly on Sales Coach, no login step.
@@ -37,7 +38,7 @@ test.describe('Sales Coach (reused session)', () => {
 
   test('should reach the Sales Coach app without re-logging in', async ({ page }) => {
     await expect(page).toHaveURL(/\/sales-coach/, { timeout: 15000 });
-    // Authenticated app shell renders the Insight logo (Logo.tsx).
+    // Authenticated app shell renders the AI Coach logo (Logo.tsx).
     await expect(salesCoach.insightLogo).toBeAttached({ timeout: 15000 });
     // No login form is present in the authenticated app.
     await expect(page.getByRole('button', { name: 'Log in with email' })).toHaveCount(0);
@@ -128,7 +129,7 @@ test.describe('Sales Coach (reused session)', () => {
     {
       name: 'Deal Plan',
       description:
-        'Intelligent agent to help you build a structured deal plan, aligning customer needs with your solution and defining clear next steps to close.',
+        'An intelligent agent to help you build a structured deal plan that outlines risks, mitigations, and recommended next steps.',
     },
     {
       name: 'Account Plan',
@@ -145,7 +146,7 @@ test.describe('Sales Coach (reused session)', () => {
   // Legacy (plain-text) agents, carried over from a previous version. RFx
   // Responder requires a response structure; Upsell & Cross Sell requires a
   // transcript upload. "Research Agent" is Coming soon (disabled) and is
-  // intentionally not covered.
+  // intentionally not covered. "BID Writer" has been removed from the app.
   const legacyAgents: AgentSpec[] = [
     {
       name: 'Pricing Strategy',
@@ -158,11 +159,6 @@ test.describe('Sales Coach (reused session)', () => {
         'An intelligent assistant designed to streamline and enhance RFx creation through automation and contextual guidance.',
       legacy: true,
       fields: { responseStructure: 'Summary Only' },
-    },
-    {
-      name: 'BID Writer',
-      description: 'A smart assistant that accelerates bid development by automating content generation.',
-      legacy: true,
     },
     {
       name: 'Upsell & Cross Sell',
@@ -179,7 +175,7 @@ test.describe('Sales Coach (reused session)', () => {
     test(`should create a ${agent.name} chat and find it in the Automation Project folder`, async ({
       page,
     }) => {
-      test.setTimeout(480000); // some agent runs (e.g. BID Writer) take several minutes
+      test.setTimeout(480000); // some agent runs (e.g. Upsell & Cross Sell) take several minutes
 
       // Fail the test if the app returns ANY HTTP 4xx/5xx during the flow.
       const httpErrors = watchHttpErrors(page);

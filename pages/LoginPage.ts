@@ -19,9 +19,18 @@ export class LoginPage {
   constructor(page: Page) {
     this.page = page;
     this.emailInput = page.getByRole('textbox', { name: /email/i });
-    this.passwordInput = page.getByRole('textbox', { name: /password/i });
+    // The Mantine PasswordInput field has no accessible name and its type flips
+    // between "password" and "text" via the visibility toggle, so locate it by
+    // its stable autocomplete attribute (fall back to type=password).
+    this.passwordInput = page
+      .locator('input[autocomplete="current-password"]')
+      .or(page.locator('input[type="password"]'))
+      .first();
     this.loginButton = page.getByRole('button', { name: 'Log in with email' });
     this.forgotPasswordLink = page.getByRole('link', { name: 'Forgot password?' });
+    // The "Sign in with SSO" link is always in the DOM but rendered hidden by
+    // default (opacity:0 + pointer-events:none); PropelAuth only reveals it
+    // conditionally. Assert on attachment rather than visibility.
     this.signInWithSSOLink = page.getByRole('link', { name: 'Sign in with SSO' });
     this.signUpLink = page.getByRole('link', { name: 'Sign up' });
     this.pageHeading = page.getByRole('heading', { name: /log in to/i });
@@ -56,9 +65,31 @@ export class LoginPage {
   }
 
   async login(email: string, password: string): Promise<void> {
-    await this.emailInput.fill(email);
-    await this.passwordInput.fill(password);
+    await this.fillStable(this.emailInput, email);
+    await this.fillStable(this.passwordInput, password);
     await this.loginButton.click();
+  }
+
+  /**
+   * Fills a PropelAuth field and confirms the value actually stuck.
+   *
+   * The PropelAuth email field runs an async SSO/email check on first input and
+   * re-renders the (controlled) input right after. A plain `fill()` is wiped by
+   * that re-render (leaving the field empty -> "Email required") and
+   * `pressSequentially` loses its leading keystrokes (wrong email -> "No account
+   * found"). So we fill, let the check settle, and re-fill until the DOM value
+   * matches what we intended before moving on.
+   */
+  private async fillStable(field: Locator, value: string): Promise<void> {
+    await field.click();
+    await field.fill(value);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await this.page.waitForTimeout(500);
+      if ((await field.inputValue()) === value) return;
+      await field.fill(value);
+    }
+    // Surface a clear failure rather than submitting a half-typed value.
+    await expect(field).toHaveValue(value, { timeout: 3000 });
   }
 
   async isLoaded(): Promise<void> {

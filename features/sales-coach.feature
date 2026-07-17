@@ -18,7 +18,7 @@ Feature: Sales Coach
 
   Scenario: Reach the Sales Coach app without re-logging in
     Then the page URL should match "/sales-coach"
-    And the Insight logo should be attached to the page
+    And the AI Coach logo should be attached to the page
     And no "Log in with email" button should be shown
 
   Scenario: Access the Sales Coach page from the navigation
@@ -72,7 +72,7 @@ Feature: Sales Coach
     Examples:
       | agent            | description                                                                                                                          |
       | Customer Profile | Research agent designed to analyse customer profile, news, financials and SWOT analysis with talking points.                          |
-      | Deal Plan        | Intelligent agent to help you build a structured deal plan, aligning customer needs with your solution and defining clear next steps to close. |
+      | Deal Plan        | An intelligent agent to help you build a structured deal plan that outlines risks, mitigations, and recommended next steps. |
       | Account Plan     | Intelligent agent to help you build a comprehensive account plan, uncovering growth opportunities and defining a strategy to deepen customer relationships. |
       | Call Plan        | Intelligent agent to help you prepare for customer calls with a structured agenda, tailored talking points and clear objectives.       |
 
@@ -94,7 +94,6 @@ Feature: Sales Coach
       | agent               | required input                        | description                                                                                                     |
       | Pricing Strategy    | none                                  | Design custom pricing solutions aligned with your goals and customer needs                                      |
       | RFx Responder       | response structure "Summary Only"     | An intelligent assistant designed to streamline and enhance RFx creation through automation and contextual guidance. |
-      | BID Writer          | none                                  | A smart assistant that accelerates bid development by automating content generation.                            |
       | Upsell & Cross Sell | transcript file upload                | Intelligent agent to help you match the requested service with upsell or crosssell opportunity from our portfolio. |
 
   # The "Research Agent" legacy card is "Coming soon" (disabled) and is

@@ -11,9 +11,8 @@ name: Playwright Tests
 # (A nightly schedule is available but currently commented out below.)
 #
 # "full" runs the agent chat-creation tests too - these create real chats and
-# trigger ~2-minute AI runs on the shared staging account (and include the
-# known BID Writer backend 504), so they are intentionally kept out of the
-# per-push run.
+# trigger ~2-minute AI runs on the shared staging account, so they are
+# intentionally kept out of the per-push run.
 
 on:
   push:

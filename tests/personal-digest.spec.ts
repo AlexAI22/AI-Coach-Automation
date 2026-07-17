@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { PersonalDigestPage } from '../pages/PersonalDigestPage';
 import { AUTH_FILE } from '../global-setup';
 import { watchHttpErrors } from './support/httpErrors';
+import { hasCredentials } from '../support/credentials';
 
 /**
  * Personal Digest → Daily Digest (https://.../personal-digest/daily-digest).
@@ -26,8 +27,8 @@ test.describe('Personal Digest — Daily Digest (reused session)', () => {
 
   test.beforeEach(async ({ page }) => {
     test.skip(
-      !process.env.EMAIL || !process.env.PASSWORD,
-      'EMAIL and PASSWORD must be set (via the environment)',
+      !hasCredentials(),
+      'Credentials must be set (AICoach_MICROSOFT_EMAIL/AICoach_MICROSOFT_PASSWORD or EMAIL/PASSWORD)',
     );
     digest = new PersonalDigestPage(page);
     await digest.goto();

@@ -7,10 +7,11 @@ import { Page, Locator, expect } from '@playwright/test';
 export class SalesCoachPage {
   readonly page: Page;
   /**
-   * Insight logo in the top-left of the authenticated app shell.
-   * Targets the dark-mode variant (Logo.tsx): alt="Insight logo" with the
-   * dark-mode PNG. It carries `class="hidden dark:block"`, so it is present in
-   * the DOM but only display-visible under a dark color scheme.
+   * App logo in the top-left of the authenticated app shell.
+   * Targets the dark-mode variant (Logo.tsx): alt="AI Coach logo" with the
+   * dark PNG (/AI-Coach_logo-dark.png). It carries `class="hidden dark:block"`,
+   * so it is present in the DOM but only display-visible under a dark color
+   * scheme.
    */
   readonly insightLogo: Locator;
   /**
@@ -37,7 +38,7 @@ export class SalesCoachPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.insightLogo = page.locator('img[alt="Insight logo"][src*="dark_mode"]');
+    this.insightLogo = page.locator('img[alt="AI Coach logo"][src*="logo-dark"]');
     this.welcomeDialogHeading = page.getByRole('heading', { name: 'Welcome to AI Coach', exact: true });
     this.welcomeDialogBody = page.getByText('personalise your experience. It only takes a minute');
     this.closeWelcomeButton = page.getByRole('button', { name: 'Skip for now' });

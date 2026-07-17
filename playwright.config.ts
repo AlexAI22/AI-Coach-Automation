@@ -5,18 +5,22 @@ import { defineConfig, devices } from '@playwright/test';
  * the repo, and no .env loader is used. Set them in your shell before running,
  * e.g. (PowerShell):
  *
- *   $env:BROWSER="chrome"; $env:HEADLESS="false"; `
- *   $env:EMAIL="you@insight.com"; $env:PASSWORD="<secret>"; `
+ *   $env:Browser="Chrome"; $env:Headless="false"; `
+ *   $env:AICoach_MICROSOFT_EMAIL="you@insight.com"; `
+ *   $env:AICoach_MICROSOFT_PASSWORD="<secret>"; `
  *   npm run test:sales-coach
  *
  *  - BROWSER  : chrome (default) | chromium | edge | firefox | webkit
+ *               (env var names are case-insensitive on Windows, and the value
+ *               is lowercased, so `$env:Browser="Chrome"` also works)
  *  - HEADLESS : false (default locally, so you SEE the browser) | true.
  *               Forced true on CI (no display available there).
  *  - SLOWMO   : ms to pause before each action so you can watch what the test
  *               does (default 250 locally, 0 on CI). Set 0 to disable.
- *  - EMAIL    : login email
- *  - PASSWORD : login password (pass it in the command; or use
- *               `npm run test:sales-coach:secure` for a hidden prompt)
+ *  - AICoach_MICROSOFT_EMAIL    : login email (legacy fallback: EMAIL)
+ *  - AICoach_MICROSOFT_PASSWORD : login password (legacy fallback: PASSWORD).
+ *               Pass it in the command, or use
+ *               `npm run test:sales-coach:secure` for a hidden prompt.
  */
 const isCI = !!process.env.CI;
 const browserKey = (process.env.BROWSER ?? 'chrome').toLowerCase();
