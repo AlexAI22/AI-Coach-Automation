@@ -81,15 +81,20 @@ export class LoginPage {
    * matches what we intended before moving on.
    */
   private async fillStable(field: Locator, value: string): Promise<void> {
+    // A single-line input silently drops newlines, so the value that can
+    // actually land in the field is the input minus any CR/LF. Compare against
+    // that so a credential stored with a stray newline can't make the check
+    // loop forever (and then hard-fail) even though the field holds the right text.
+    const expected = value.replace(/[\r\n]+/g, '');
     await field.click();
-    await field.fill(value);
+    await field.fill(expected);
     for (let attempt = 0; attempt < 5; attempt++) {
       await this.page.waitForTimeout(500);
-      if ((await field.inputValue()) === value) return;
-      await field.fill(value);
+      if ((await field.inputValue()) === expected) return;
+      await field.fill(expected);
     }
     // Surface a clear failure rather than submitting a half-typed value.
-    await expect(field).toHaveValue(value, { timeout: 3000 });
+    await expect(field).toHaveValue(expected, { timeout: 3000 });
   }
 
   async isLoaded(): Promise<void> {

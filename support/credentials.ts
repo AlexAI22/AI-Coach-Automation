@@ -16,11 +16,18 @@
  *   npm run test:login
  */
 export function getEmail(): string | undefined {
-  return process.env.AICoach_MICROSOFT_EMAIL ?? process.env.EMAIL;
+  // Emails never contain surrounding whitespace, so trim fully — CI secrets are
+  // frequently stored with a trailing newline, which would otherwise be typed
+  // into the login field and rejected.
+  const raw = process.env.AICoach_MICROSOFT_EMAIL ?? process.env.EMAIL;
+  return raw?.trim();
 }
 
 export function getPassword(): string | undefined {
-  return process.env.AICoach_MICROSOFT_PASSWORD ?? process.env.PASSWORD;
+  // Strip only trailing CR/LF (the artifact of a secret stored with a trailing
+  // newline) so a real password's leading/internal characters are preserved.
+  const raw = process.env.AICoach_MICROSOFT_PASSWORD ?? process.env.PASSWORD;
+  return raw?.replace(/[\r\n]+$/, '');
 }
 
 /** True when both an email and a password are available in the environment. */
