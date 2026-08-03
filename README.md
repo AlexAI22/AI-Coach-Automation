@@ -53,6 +53,7 @@ command that runs the tests. No `.env` loader is used.
 | `PASSWORD` | staging account password | — (required) |
 | `BROWSER` | `chrome` \| `chromium` \| `edge` \| `firefox` \| `webkit` | `chrome` |
 | `HEADLESS` | `true` \| `false` | `true` |
+| `TRACE` | `on` = record ONE trace for the whole run (contains the login request — keep it local) | off |
 
 ```powershell
 # PowerShell
@@ -77,7 +78,7 @@ To keep the password off the command line entirely, use the hidden prompt instea
 | `npm run test:headed` | Full suite with a visible browser |
 | `npm run test:login` | Login form tests |
 | `npm run test:login:headed` | Login form tests, visible browser |
-| `npm run test:sales-coach` | Authenticated Sales Coach tests (`--workers=1`) |
+| `npm run test:sales-coach` | Authenticated Sales Coach tests |
 | `npm run test:sales-coach:headed` | Sales Coach tests, visible browser |
 | `npm run test:sales-coach:secure` | Sales Coach tests, password entered at a hidden prompt |
 | `npm run report` | Open the last HTML report |
@@ -85,7 +86,23 @@ To keep the password off the command line entirely, use the hidden prompt instea
 > Prefix any command with the credential/browser env vars, e.g.
 > `$env:EMAIL="..."; $env:PASSWORD="..."; npm run test:sales-coach`.
 > The staging backend is slow and all credentialed tests share one account, so the
-> Sales Coach scripts already run with `--workers=1`.
+> whole suite runs single-worker (`workers: 1`, `fullyParallel: false`).
+
+### One browser window per run
+
+A run opens the browser **once** and every test drives that same window — handy when
+watching a headed run, and much lighter on the shared staging account. This is done
+with worker-scoped `context`/`page` fixtures in
+[tests/support/fixtures.ts](tests/support/fixtures.ts); the login happens in that same
+window, so there is no separate `globalSetup` browser any more.
+
+Two details worth knowing:
+
+- The login-form specs need a logged-out page, so they take `anonPage` instead of
+  `page`. That is a second window in the **same** browser, created only when those
+  specs run.
+- Playwright discards a worker after a test failure, so a failing run reopens the
+  window for the remaining tests (the saved session is reused, no second login).
 
 ### Type-checking
 
@@ -101,8 +118,8 @@ CI is defined in [.github/workflows/playwright.yml](.github/workflows/playwright
 
 - **Triggers:** push to `main`, pull requests, and manual `workflow_dispatch`
   (a nightly schedule is included but currently commented out).
-- **Runtime:** Ubuntu + bundled **Chromium**, headless. `CI=true` enables 2 retries
-  and single-worker mode (shared staging account).
+- **Runtime:** Ubuntu + bundled **Chromium**, headless. `CI=true` enables 2 retries;
+  the suite is single-worker everywhere (shared staging account).
 - **Suites:**
   - push / PR / nightly → **smoke** (fast, non-mutating tests only — the mutating
     chat-creation tests are excluded via `--grep-invert "should create a"`).
@@ -132,10 +149,13 @@ credentials are never stored in the repository.
 │   ├── LoginPage.ts           # PropelAuth login screen
 │   └── SalesCoachPage.ts      # Authenticated app shell + Sales Coach page
 ├── tests/
-│   ├── login-success.spec.ts  # Login form tests (logged-out)
-│   └── sales-coach.spec.ts     # Sales Coach tests (reused auth session)
-├── global-setup.ts            # Logs in ONCE, saves the session for reuse
-├── playwright.config.ts       # Base URL, env-driven browser/headless, reporter, global setup
+│   ├── login-success.spec.ts  # Login form tests (logged-out `anonPage`)
+│   ├── sales-coach.spec.ts    # Sales Coach tests (shared authenticated window)
+│   └── support/fixtures.ts    # ONE browser/window for the whole run, shared `page`
+├── support/
+│   ├── credentials.ts         # Credentials read from the environment
+│   └── session.ts             # Logs in ONCE in the shared window, saves the session
+├── playwright.config.ts       # Base URL, env-driven browser/headless, single worker, reporter
 ├── tsconfig.json              # Type-checking config (Node16, strict)
 ├── scripts/run-sales-coach.ps1 # Runs Sales Coach tests with a hidden password prompt
 ├── features/                  # BDD (Gherkin) specification of the flows
@@ -153,18 +173,22 @@ brittle CSS, and credential errors are matched by message because PropelAuth ren
 them with generated (unstable) Mantine class names.
 
 ### Session reuse (log in once)
-`global-setup.ts` logs in a single time before the run and saves the authenticated
-session to `playwright/.auth/user.json`. The Sales Coach specs opt in with
-`test.use({ storageState: ... })`, so they start **already authenticated** and never
-re-login — making them fast and avoiding repeated logins against the shared account.
-The login form specs deliberately stay logged-out to test the login page itself.
+`support/session.ts` logs in a single time — in the run's shared window, on the first
+test that needs it — and saves the authenticated session to
+`playwright/.auth/user.json`. Later runs load that file, so they skip the login form
+entirely; if the saved session has expired (staging redirects to PropelAuth), it logs in
+again and refreshes the file. Credentialed specs therefore start **already
+authenticated** and never re-login per test. The login-form specs deliberately stay
+logged out (`anonPage`) to test the login page itself.
 
 ### Credential safety in traces
-`sales-coach.spec.ts` runs with `trace: 'off'`. A Playwright trace captures network
-request bodies and DOM snapshots, both of which contain real credentials on the login
-request — disabling tracing for credentialed specs ensures no `trace.zip` / HTML-report
-artifact can embed them. The session file (`playwright/.auth/`) is gitignored, and
-credentials are passed as environment variables at runtime — never stored in the repo.
+Tracing is **off** (`trace: 'off'`). A Playwright trace captures network request bodies
+and DOM snapshots, both of which contain real credentials on the login request and
+account data afterwards, so no `trace.zip` / HTML-report artifact can embed them. Set
+`TRACE=on` when you need to debug locally: it records one trace for the whole run
+(login included) — treat that file as a secret and delete it. The session file
+(`playwright/.auth/`) is gitignored, and credentials are passed as environment variables
+at runtime — never stored in the repo.
 
 ---
 
@@ -200,5 +224,6 @@ npm run report
 | Credentialed tests are skipped | `EMAIL` / `PASSWORD` env vars not set for the run — pass them in the command. |
 | `Your account has been locked for security reasons` | Too many failed logins tripped PropelAuth's lockout; reset the password or wait. |
 | `page.goto` timeout in `beforeEach` | Staging responding slowly; navigation uses `waitUntil: 'domcontentloaded'`, and re-running usually clears it. |
-| Flaky failures when running everything in parallel | Shared staging account + slow backend. Run with `--workers=1`. |
+| Flaky failures when running everything in parallel | Shared staging account + slow backend — the config pins the run to one worker (`workers: 1`); don't override it with `--workers`. |
+| A second browser window appears mid-run | Playwright discards the worker after a test failure and reopens the window for the remaining tests; the login-form specs also use their own logged-out window. |
 ```

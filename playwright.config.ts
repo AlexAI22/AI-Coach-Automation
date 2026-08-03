@@ -17,6 +17,8 @@ import { defineConfig, devices } from '@playwright/test';
  *               Forced true on CI (no display available there).
  *  - SLOWMO   : ms to pause before each action so you can watch what the test
  *               does (default 250 locally, 0 on CI). Set 0 to disable.
+ *  - TRACE    : on = record ONE trace for the whole run (off by default; the
+ *               file contains the login request, so keep it local).
  *  - AICoach_MICROSOFT_EMAIL    : login email (legacy fallback: EMAIL)
  *  - AICoach_MICROSOFT_PASSWORD : login password (legacy fallback: PASSWORD).
  *               Pass it in the command, or use
@@ -73,28 +75,35 @@ export default defineConfig({
   /* Ignore scratch/recon specs (prefixed with an underscore) so they never run
      in CI or a normal `playwright test`. */
   testIgnore: '**/_*.spec.ts',
-  /* Log in once before the run; credentialed tests reuse the saved session. */
-  globalSetup: require.resolve('./global-setup'),
-  /* Run tests in files in parallel */
-  fullyParallel: true,
+  /* ONE browser window for the whole run: a single worker (so a single browser
+     process) driving the worker-scoped page from tests/support/fixtures.ts. The
+     login also happens in that window, which is why there is no globalSetup —
+     it used to open (and close) a browser of its own before the run. */
+  fullyParallel: false,
+  workers: 1,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
   /* The staging backend renders content asynchronously and slowly, so give
      web-first assertions more room than the 5s default. */
   expect: { timeout: 20000 },
+  /* The first test also pays for opening the shared window (and, on the first
+     run of the day, the login) — the 30s default is not enough for that against
+     slow staging. Long flows still raise it further via test.setTimeout(). */
+  timeout: 120000,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
     baseURL: 'https://stage-aicoach.insight.com',
 
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    /* No tracing. The suite runs against a real staging account in a reused
+       session, so a trace.zip would embed account data (and the login request).
+       Per-test artifacts do not apply to the shared window anyway — set
+       TRACE=on for a single whole-run trace when debugging locally. */
+    trace: 'off',
 
     /* Headed/headless is driven by the HEADLESS env var (default headless). */
     headless,

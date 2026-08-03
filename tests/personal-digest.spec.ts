@@ -1,24 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/fixtures';
 import { PersonalDigestPage } from '../pages/PersonalDigestPage';
-import { AUTH_FILE } from '../global-setup';
 import { watchHttpErrors } from './support/httpErrors';
 import { hasCredentials } from '../support/credentials';
 
 /**
  * Personal Digest → Daily Digest (https://.../personal-digest/daily-digest).
  *
- * Uses the reused authenticated session established once in global-setup.ts
- * (storageState). Tracing stays off because a reused session's requests/snapshots
- * can carry account context.
- *
- * Clipboard permissions are granted so the "Copy talking point" action can be
- * verified against the clipboard.
+ * Runs in the single shared browser window from tests/support/fixtures.ts, which
+ * is logged in once per run and already carries the clipboard permissions the
+ * "Copy talking point" assertion needs.
  */
-test.use({
-  trace: 'off',
-  storageState: AUTH_FILE,
-  permissions: ['clipboard-read', 'clipboard-write'],
-});
 
 test.describe('Personal Digest — Daily Digest (reused session)', () => {
   test.describe.configure({ mode: 'default' });
