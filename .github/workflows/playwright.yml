@@ -45,7 +45,8 @@ jobs:
       EMAIL: ${{ secrets.AICOACH_EMAIL }}
       PASSWORD: ${{ secrets.AICOACH_PASSWORD }}
       # CI-friendly runtime config (bundled Chromium, headless). CI=true also
-      # enables retries and single-worker mode in playwright.config.ts.
+      # enables retries in playwright.config.ts (the suite is always
+      # single-worker, so the run uses one browser).
       BROWSER: chromium
       HEADLESS: 'true'
     steps:

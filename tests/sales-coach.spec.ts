@@ -1,27 +1,22 @@
-import { test, expect } from '@playwright/test';
 import path from 'path';
+import { test, expect } from './support/fixtures';
 import { SalesCoachPage } from '../pages/SalesCoachPage';
 import { DraftChatPage, type DraftChatOptions } from '../pages/DraftChatPage';
-import { AUTH_FILE } from '../global-setup';
 import { watchHttpErrors } from './support/httpErrors';
 import { hasCredentials } from '../support/credentials';
 
 /**
  * Sales Coach flows against the real staging tenant.
  *
- * The session is established ONCE in global-setup.ts and reused here via
- * `storageState` — these tests do NOT log in (or out) per test; they start
- * already authenticated and navigate straight to the app.
- *
- * Tracing stays off: even a reused session's requests/snapshots can carry
- * account context, so no trace.zip / HTML-report artifact is produced here.
+ * `page` comes from tests/support/fixtures.ts: the single browser window the
+ * whole run shares, logged in ONCE. These tests do NOT log in (or out) per test;
+ * they start already authenticated and navigate straight to the app.
  */
-test.use({ trace: 'off', storageState: AUTH_FILE });
 
 test.describe('Sales Coach (reused session)', () => {
   // Default mode (not serial) so one failure does not skip the rest of the
-  // group. Run with `--workers=1` to keep requests sequential against the slow,
-  // shared-account staging backend.
+  // group. The run is single-worker (see playwright.config.ts), so requests stay
+  // sequential against the slow, shared-account staging backend.
   test.describe.configure({ mode: 'default' });
 
   let salesCoach: SalesCoachPage;

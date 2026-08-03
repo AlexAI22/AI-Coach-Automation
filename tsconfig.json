@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["tests/**/*.ts", "pages/**/*.ts", "playwright.config.ts", "global-setup.ts"]
+  "include": ["tests/**/*.ts", "pages/**/*.ts", "support/**/*.ts", "playwright.config.ts"]
 }

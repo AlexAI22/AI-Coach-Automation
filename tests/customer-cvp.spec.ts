@@ -1,21 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/fixtures';
 import { CustomerValuePortalPage } from '../pages/CustomerValuePortalPage';
 import { CustomerAccountPage } from '../pages/CustomerAccountPage';
-import { AUTH_FILE } from '../global-setup';
 import { watchHttpErrors } from './support/httpErrors';
 import { hasCredentials } from '../support/credentials';
 
 /**
  * Customer Value Portal (https://.../customer-value-portal).
  *
- * Uses the reused authenticated session established once in global-setup.ts
- * (storageState). Tracing stays off because a reused session's requests/snapshots
- * can carry account context.
+ * Runs in the single shared browser window from tests/support/fixtures.ts, which
+ * is logged in once per run.
  */
-test.use({
-  trace: 'off',
-  storageState: AUTH_FILE,
-});
 
 test.describe('Customer Value Portal (reused session)', () => {
   test.describe.configure({ mode: 'default' });
@@ -200,33 +194,28 @@ const ACCOUNTS = [
 ];
 
 // The detail assertions are read-only, so for each customer they run serially
-// against a single page loaded once in beforeAll. This avoids re-navigating
+// against the account page loaded once in beforeAll. This avoids re-navigating
 // (and re-triggering the intermittent empty-<main> render) for every test, and
 // is far gentler on the staging backend.
 for (const customer of ACCOUNTS) {
   test.describe(`Customer Value Portal — Account detail: ${customer.name}`, () => {
     test.describe.configure({ mode: 'serial' });
 
-    let context: import('@playwright/test').BrowserContext | undefined;
     let account: CustomerAccountPage;
 
-    test.beforeAll(async ({ browser }) => {
+    // `sharedPage` is the run's single window (worker-scoped, so it is usable
+    // from beforeAll) — no extra context/window is opened for this block.
+    test.beforeAll(async ({ sharedPage }) => {
       if (!hasCredentials()) return; // tests skip below
       test.setTimeout(120000); // account view can need several reloads to mount
-      context = await browser.newContext({ storageState: AUTH_FILE });
-      const page = await context.newPage();
-      account = new CustomerAccountPage(page);
+      account = new CustomerAccountPage(sharedPage);
       await account.goto(customer.id);
-    });
-
-    test.afterAll(async () => {
-      await context?.close();
     });
 
     test.beforeEach(() => {
       test.skip(
-        !process.env.EMAIL || !process.env.PASSWORD,
-        'EMAIL and PASSWORD must be set (via the environment)',
+        !hasCredentials(),
+        'Credentials must be set (AICoach_MICROSOFT_EMAIL/AICoach_MICROSOFT_PASSWORD or EMAIL/PASSWORD)',
       );
     });
 

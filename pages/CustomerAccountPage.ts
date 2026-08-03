@@ -2,7 +2,7 @@ import { Page, Locator, expect } from '@playwright/test';
 
 /**
  * Customer account detail page
- * (https://.../customer-value-portal/account?ggp_id=<id>).
+ * (https://.../customer-value-portal/account?id=<id>&id_type=SourceGGP).
  *
  * Reached by clicking a customer row on the Customer Value Portal. Layout: a
  * breadcrumb + title header with a currency <select>, four KPI cards, a
