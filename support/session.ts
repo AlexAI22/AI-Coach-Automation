@@ -1,5 +1,5 @@
 import fs from 'fs';
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { getEmail, getPassword } from './credentials';
 
@@ -31,7 +31,26 @@ export function savedSessionExists(): boolean {
  * Does nothing when no credentials are set — the credentialed tests skip
  * themselves in that case.
  */
+/**
+ * In-flight/completed auth for this worker process. The fixture that calls this
+ * is worker-scoped, so it already runs once per run — this memo makes that a
+ * guarantee rather than a consequence of fixture scoping: any extra caller gets
+ * the same result without a second trip to the login form. A worker restart
+ * re-imports the module and resets it, which is correct — that is a new browser.
+ */
+let authInFlight: Promise<void> | null = null;
+
 export async function ensureAuthenticated(page: Page): Promise<void> {
+  if (authInFlight) return authInFlight;
+  // Reset on failure so a retry can genuinely try again.
+  authInFlight = authenticate(page).catch((error) => {
+    authInFlight = null;
+    throw error;
+  });
+  return authInFlight;
+}
+
+async function authenticate(page: Page): Promise<void> {
   const email = getEmail();
   const password = getPassword();
   if (!email || !password) {
@@ -41,12 +60,33 @@ export async function ensureAuthenticated(page: Page): Promise<void> {
     return;
   }
 
-  // Staging redirects to PropelAuth when the session is missing or expired, so
-  // the landing URL tells us whether the saved session is still good.
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  if (!/login/i.test(page.url())) return;
 
   const loginPage = new LoginPage(page);
+  // The authenticated app shell; PropelAuth's login page is a separate app and
+  // carries no data-sentry-component hooks, so this cannot match there.
+  const appShell = page.locator('[data-sentry-component="Header"]');
+
+  // Staging redirects to PropelAuth when the session is missing or expired, but
+  // that redirect is CLIENT-SIDE and happens after domcontentloaded. Reading
+  // page.url() here would race it and, when it lost, wrongly conclude the saved
+  // session was still good — skipping the login and stranding every later
+  // navigation on the login form (which surfaces as an unrelated "element not
+  // found" timeout deep in a test). So wait for whichever actually renders.
+  await expect(
+    loginPage.loginButton.or(appShell).first(),
+    'Neither the AI Coach app shell nor the PropelAuth login form rendered',
+  ).toBeVisible({ timeout: 45000 });
+
+  if (await appShell.isVisible()) {
+    console.warn('[session] Saved session still valid — no login needed this run.');
+    // Re-save it so the refreshed token is persisted rather than letting the
+    // stored one age out silently.
+    await page.context().storageState({ path: AUTH_FILE });
+    return;
+  }
+
+  console.warn('[session] Saved session missing or expired — logging in once for this run.');
   await loginPage.isLoaded();
   await loginPage.loginExpectingSuccess(email, password);
   // Save (or refresh) the session so subsequent runs skip the login form.
