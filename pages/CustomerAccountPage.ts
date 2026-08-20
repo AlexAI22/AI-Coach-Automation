@@ -220,6 +220,15 @@ export class CustomerAccountPage {
     await this.expansionPlanCards.nth(index).getByRole('button', { name: 'Coach Me' }).click();
   }
 
+  /**
+   * "Upload Materials" action. It lives in the TAB STRIP header (alongside the
+   * tab buttons), not inside any tab panel — it used to be asserted inside
+   * AccountRoadmap, which stopped matching when the app moved it out.
+   */
+  get uploadMaterialsButton(): Locator {
+    return this.tabs.getByRole('button', { name: 'Upload Materials' });
+  }
+
   /** The single Coach Me button at the foot of the Account Roadmap tab. */
   get accountRoadmapCoachMeButton(): Locator {
     return this.accountRoadmap.getByRole('button', { name: 'Coach Me' });

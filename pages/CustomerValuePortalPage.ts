@@ -48,10 +48,17 @@ export class CustomerValuePortalPage {
     this.root = page.locator('[data-sentry-component="CustomerValuePortal"]');
     this.heading = page.getByRole('heading', { name: 'Microsoft Customer Insights', level: 1 });
     // The subtitle is rendered twice (responsive layouts); scope to the first.
-    this.description = page.getByText('Manage and track your EMEA customer relationships').first();
+    // Matched by pattern because the qualifier has already changed once
+    // ("your EMEA customer relationships" -> "your Microsoft customer
+    // relationships"); the surrounding sentence is the stable part.
+    this.description = page.getByText(/Manage and track your .*customer relationships/i).first();
     this.demoModeButton = page.getByRole('button', { name: 'Demo Mode' });
     this.currencySelect = page.locator('[data-sentry-component="CurrencySelect"] select');
-    this.searchInput = page.getByPlaceholder('Search customers by name...');
+    // Located via the Search component rather than its placeholder: the copy has
+    // already changed once ("Search customers by name..." -> "Search by
+    // customer's sold-to, RP, GP, or GGP name or ID number") and contains a
+    // curly apostrophe, so matching on it is needlessly brittle.
+    this.searchInput = page.locator('[data-sentry-component="Search"] input');
 
     this.tableHeader = page.locator('[data-sentry-component="TableHeader"]');
     this.rows = page.locator('[data-sentry-component="TableBody"]');
@@ -111,21 +118,47 @@ export class CustomerValuePortalPage {
    */
   async ensureCustomersLoaded(): Promise<void> {
     await this.dismissWelcomeDialog();
+
+    // Wait until the portal is actually interactive before reading or clicking
+    // anything. goto() only waits for domcontentloaded, and Demo Mode PERSISTS
+    // across navigation — so reading the toggle mid-hydration can report the
+    // server-rendered (inactive) class while the real state is on. Clicking on
+    // that misread switches Demo Mode OFF and the list then never loads. This
+    // was the intermittent "TableBody not found" failure.
+    await this.demoModeButton.waitFor({ state: 'visible', timeout: 30000 });
+    await this.tableHeader.waitFor({ state: 'visible', timeout: 30000 });
+
     const tryAgain = this.page.getByRole('button', { name: 'Try again' });
 
-    for (let attempt = 0; attempt < 4; attempt++) {
-      if (!(await this.isDemoModeOn())) {
-        await this.demoModeButton.click();
+    // NOTE: do NOT treat SkeletonRow as "loading, leave the toggle alone". Those
+    // placeholders are ALSO the empty state when there are no customers, so
+    // skipping the toggle while they are on screen means Demo Mode never gets
+    // enabled and the list can never populate.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      // Cheap check first: the rows are frequently already there.
+      if (await this.rows.first().isVisible({ timeout: 1000 }).catch(() => false)) {
+        return;
       }
+
       if (await tryAgain.isVisible().catch(() => false)) {
         await tryAgain.click();
+      } else if (!(await this.isDemoModeOn())) {
+        // Fresh account: Demo Mode injects the sample customer set.
+        await this.demoModeButton.click();
+      } else if (attempt > 0) {
+        // Reports on but nothing arrived — bounce it to force a refetch.
+        await this.demoModeButton.click();
+        await this.demoModeButton.click();
       }
-      if (await this.rows.first().isVisible({ timeout: 8000 }).catch(() => false)) {
+
+      // MEASURED: rows land ~6-8s after Demo Mode is enabled. The old 8s wait
+      // sat exactly on that boundary, so a slower runner tipped it into failure.
+      if (await this.rows.first().isVisible({ timeout: 25000 }).catch(() => false)) {
         return;
       }
     }
     // Final assertion surfaces a clear failure if the list still won't load.
-    await expect(this.rows.first()).toBeVisible({ timeout: 15000 });
+    await expect(this.rows.first()).toBeVisible({ timeout: 30000 });
   }
 
   /** The customer-name element within a given row. */

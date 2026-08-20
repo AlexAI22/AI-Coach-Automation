@@ -13,7 +13,7 @@
 
 Feature: Customer Value Portal
   As an authenticated AI Coach user
-  I want to browse and manage my EMEA customer relationships
+  I want to browse and manage my Microsoft customer relationships
   So that I can review each customer's channels, revenue and account team
 
   Background:
@@ -23,8 +23,8 @@ Feature: Customer Value Portal
   Scenario: Load the portal with title, search and currency controls
     Then the page URL should match "/customer-value-portal"
     And the "Microsoft Customer Insights" heading should be visible
-    And the "Manage and track your EMEA customer relationships" description should be visible
-    And the "Search customers by name..." box should be visible
+    And the "Manage and track your Microsoft customer relationships" description should be visible
+    And the customer search box should be visible
     And the "Demo Mode" button should be visible
     And the currency selector should offer "GBP", "USD" and "EUR"
     And no HTTP 4xx or 5xx errors should have occurred while the page loaded
@@ -210,7 +210,7 @@ Feature: Customer Value Portal - Account detail
     Given I open the account page for "<customer>"
     When I open the "Account Roadmap" tab
     Then the "Account Roadmap" heading should be visible
-    And an "Upload Materials" button should be visible
+    And an "Upload Materials" button should be visible in the tab strip
     And exactly 4 context accordion sections should be shown
     And the sections "Client Context", "Insight and Client Relationship", "Customer Personas" and "Technology Landscape" should be listed
     And a "Coach Me" button should be visible

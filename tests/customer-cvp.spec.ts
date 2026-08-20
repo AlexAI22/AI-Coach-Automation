@@ -289,7 +289,8 @@ for (const customer of ACCOUNTS) {
       await account.openTab('Account Roadmap');
       await expect(account.accountRoadmap).toBeVisible({ timeout: 20000 });
       await expect(account.accountRoadmap.getByRole('heading', { name: 'Account Roadmap' })).toBeVisible();
-      await expect(account.accountRoadmap.getByRole('button', { name: 'Upload Materials' })).toBeVisible();
+      // "Upload Materials" sits in the tab strip, not inside the roadmap panel.
+      await expect(account.uploadMaterialsButton).toBeVisible();
 
       // All four context accordion sections are present.
       await expect(account.roadmapSections).toHaveCount(CustomerAccountPage.ROADMAP_SECTIONS.length);
