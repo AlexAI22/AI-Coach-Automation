@@ -62,13 +62,18 @@ jobs:
       BROWSER: chromium
       HEADLESS: 'true'
     steps:
+      # v7 of these actions runs on Node 24. The v4 line targeted Node 20, which
+      # GitHub retired for action runtimes, so every run logged a deprecation
+      # warning and was force-run on Node 24 anyway.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # Node 20 is end-of-life; 24 also matches what the suite is developed
+          # against locally, so CI and local runs cannot diverge on runtime.
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -111,7 +116,7 @@ jobs:
 
       - name: Upload HTML report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ github.run_id }}
           path: playwright-report/
