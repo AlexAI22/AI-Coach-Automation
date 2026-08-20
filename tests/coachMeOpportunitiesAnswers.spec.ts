@@ -66,26 +66,24 @@ test.describe(`Coach Me answers — ${CUSTOMER.name} / ${OPPORTUNITY}`, () => {
   });
 
   /**
-   * KNOWN ISSUE — prompt 7, "How should I engage with Microsoft for this offer?".
-   * The app answers, in full:
+   * KNOWN PRODUCT ISSUE — prompt 7, "How should I engage with Microsoft for this
+   * offer?". The app answers, in full:
    *
    *   "Guidance for engaging with Microsoft for this offer is not yet available.
    *    The required Advisory Motion training content has not been loaded."
    *
-   * That is missing CONTENT on staging, not a test defect, so the assertions are
-   * left exactly as they are for every other prompt rather than being weakened
-   * to accommodate it. Marked fixme so the nightly is not red every night for a
-   * gap the suite cannot fix; it starts guarding this prompt again the moment
-   * the Advisory Motion content is loaded. Remove the `.fixme` line then.
+   * 140 characters, and it trips FAILURE_MARKERS. That is missing CONTENT on
+   * staging, not a test defect, so this case RUNS and FAILS on purpose: the
+   * assertions stay identical to every other prompt, and the failure is the
+   * standing signal that the Advisory Motion content is not loaded. It will
+   * pass by itself once the content lands — no edit needed here.
+   *
+   * Re-confirmed still failing after the content check on the day this was
+   * written; do not "fix" it by lowering MIN_ANSWER_LENGTH or trimming
+   * FAILURE_MARKERS, which would hide the gap instead of reporting it.
    */
-  const KNOWN_CONTENT_GAP = 'How should I engage with Microsoft for this offer?';
-
   for (const [index, promptText] of PROMPTS.entries()) {
     test(`prompt ${index + 1} should return a usable answer: "${promptText}"`, async ({ page }, testInfo) => {
-      test.fixme(
-        promptText === KNOWN_CONTENT_GAP,
-        'KNOWN ISSUE: app returns "Advisory Motion training content has not been loaded" instead of guidance',
-      );
       test.setTimeout(600000); // a single answer has been observed to take ~2.5 min
 
       const httpErrors = watchHttpErrors(page);

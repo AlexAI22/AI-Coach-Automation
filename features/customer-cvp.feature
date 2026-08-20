@@ -56,21 +56,33 @@ Feature: Customer Value Portal
     When I clear the search box
     Then the search box value should be empty
 
-  @known-issue @skip
-  Scenario: Filter the customer list by name via search
-    # KNOWN ISSUE: search does not filter the list on staging. Verified manually
-    # against the Demo Mode data (fill, keystroke typing, matching name,
-    # substring and non-match all leave every row visible). This scenario
-    # documents the intended behaviour and is skipped until search is wired up.
+  Scenario: Filter out non-matching customers via search
+    # This half of search IS wired up now, so it runs and passes. The filter is
+    # debounced and an in-flight request can briefly land a stale empty result,
+    # so the automation retries rather than reading the row count once.
     Given I dismiss the "Welcome to AI Coach" modal if it is shown
     And Demo Mode is enabled so sample customers are loaded
-    When I search for an existing customer's name
-    Then only rows whose name contains the query should be shown
-    And the originating customer should remain visible
     When I search for a name that does not exist
     Then no customer rows should be shown
     When I clear the search box
     Then the full customer list should be restored
+
+  @known-issue
+  Scenario: Narrow the list to matching customers via search
+    # KNOWN PRODUCT ISSUE - this scenario RUNS and FAILS on purpose.
+    # Measured against the Demo Mode set (5 customers): searching "Ballyvesey"
+    # leaves all 5 rows visible and the label still reads "Showing 5 of 5
+    # customers", so unrelated customers stay on screen. Searching by customer
+    # ID behaves the same. Excluding a non-matching string DOES work, which is
+    # why that half is the separate passing scenario above.
+    # The assertion states the INTENDED behaviour, so the failure is the
+    # standing signal that search is half-implemented; it passes by itself once
+    # filtering is finished, with no edit needed.
+    Given I dismiss the "Welcome to AI Coach" modal if it is shown
+    And Demo Mode is enabled so sample customers are loaded
+    When I search for an existing customer's name
+    Then the searched-for customer should remain visible
+    And every row still on screen should match the query
 
   Scenario: Change the displayed currency symbol
     Given I dismiss the "Welcome to AI Coach" modal if it is shown

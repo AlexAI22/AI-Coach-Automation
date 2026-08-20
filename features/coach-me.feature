@@ -231,10 +231,10 @@ Feature: Coach Me - Opportunities answers
   #    That is a CONTENT GAP on staging, not a test defect, so the assertion is
   #    NOT weakened to accommodate it - the phrasing is in FAILURE_MARKERS so
   #    the failure names its cause rather than only tripping the length floor.
-  #    The case is marked test.fixme so the nightly is not red every night for
-  #    a gap the suite cannot fix; it reports as SKIPPED and starts guarding
-  #    this prompt again as soon as the content is loaded. Remove the .fixme
-  #    line in coachMeOpportunitiesAnswers.spec.ts then.
+  #    The case RUNS and FAILS on purpose so the gap stays visible rather than
+  #    hidden behind a skip. It passes by itself once the content is loaded, with
+  #    no edit needed. Do NOT 'fix' it by lowering MIN_ANSWER_LENGTH or trimming
+  #    FAILURE_MARKERS - that would hide the gap instead of reporting it.
   #
   #  - Prompt 8 is terse (~279 chars) but a legitimate status answer about the
   #    Partner Funding team, so it clears the 200-character floor honestly.

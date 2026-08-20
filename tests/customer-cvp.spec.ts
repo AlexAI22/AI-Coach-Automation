@@ -89,32 +89,59 @@ test.describe('Customer Value Portal (reused session)', () => {
     await expect(cvp.searchInput).toHaveValue('');
   });
 
-  // KNOWN ISSUE: the search box does not filter the customer list on staging.
-  // Verified manually against the Demo Mode data set (the only data available on
-  // a fresh account): typing a matching name, a substring, or a non-matching
-  // string all leave every row visible. Kept as fixme so it starts running (and
-  // guarding the behaviour) once search is wired up. Remove `.fixme` then.
-  test.fixme('should filter the customer list by name via search', async () => {
+  // Search has been partly wired up since this suite was written: excluding
+  // non-matching customers now works, so it is asserted for real rather than
+  // skipped along with the half that does not (see the next test).
+  test('should filter out non-matching customers via search', async () => {
     await cvp.ensureCustomersLoaded();
     const total = await cvp.rows.count();
+    expect(total).toBeGreaterThan(0);
+
+    await cvp.search('zzzz-no-such-customer-zzzz');
+    await expect(cvp.rows).toHaveCount(0);
+
+    // Clearing restores the full list. The filter is debounced and an in-flight
+    // request can briefly land a stale empty result, so rely on the web-first
+    // retry here rather than reading the count once.
+    await cvp.search('');
+    await expect(cvp.rows).toHaveCount(total);
+  });
+
+  /**
+   * KNOWN PRODUCT ISSUE — a MATCHING query does not narrow the list.
+   *
+   * Measured against the Demo Mode data set (5 customers): searching
+   * "Ballyvesey" leaves all 5 rows visible and the label still reads
+   * "Showing 5 of 5 customers", so unrelated customers (Inflexion Buyout V
+   * Investments LP, Slater & Gordon) stay on screen. Searching by customer ID
+   * behaves the same way. Excluding a non-matching string DOES work, which is
+   * why that half is a separate, passing test above.
+   *
+   * This runs and FAILS on purpose: the assertion states the intended
+   * behaviour, and the failure is the standing signal that search is still
+   * half-implemented. It will pass by itself once filtering is finished — no
+   * edit needed here.
+   */
+  test('should narrow the list to matching customers via search', async () => {
+    await cvp.ensureCustomersLoaded();
 
     const fullName = await cvp.firstCustomerName();
     const token = fullName.split(/\s+/)[0];
 
-    // Matching query narrows the list to rows containing the query.
     await cvp.search(token);
+    // The searched-for customer stays listed...
     await expect(cvp.rows.filter({ hasText: fullName })).toHaveCount(1);
-    const filtered = await cvp.rows.count();
-    expect(filtered).toBeLessThanOrEqual(total);
-    for (let i = 0; i < filtered; i++) {
-      await expect(cvp.nameOf(cvp.rows.nth(i))).toContainText(new RegExp(token, 'i'));
+
+    // ...and every row still on screen matches what was typed.
+    const visible = await cvp.rows.count();
+    for (let i = 0; i < visible; i++) {
+      await expect(
+        cvp.nameOf(cvp.rows.nth(i)),
+        `Row ${i + 1} of ${visible} does not match the query "${token}" — the list was not filtered`,
+      ).toContainText(new RegExp(token, 'i'));
     }
 
-    // A non-matching query yields no rows; clearing restores the full list.
-    await cvp.search('zzzz-no-such-customer-zzzz');
-    await expect(cvp.rows).toHaveCount(0);
     await cvp.search('');
-    await expect(cvp.rows).toHaveCount(total);
   });
 
   test('should change the displayed currency symbol', async () => {
