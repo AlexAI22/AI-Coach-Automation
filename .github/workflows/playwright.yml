@@ -7,8 +7,8 @@ name: Playwright Tests
 #
 # Test selection:
 #   push / pull_request        -> "smoke" (fast, non-mutating tests only)
-#   manual (workflow_dispatch) -> choose "smoke" or "full"
-# (A nightly schedule is available but currently commented out below.)
+#   nightly schedule           -> "smoke" (see the cron note below)
+#   manual (workflow_dispatch) -> choose "smoke", "full" or "coach-me"
 #
 # "full" runs the agent chat-creation tests too - these create real chats and
 # trigger ~2-minute AI runs on the shared staging account, so they are
@@ -19,15 +19,24 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # Nightly schedule disabled for now - re-enable by uncommenting.
-  # schedule:
-  #   - cron: '0 6 * * *'
+  # Nightly run at 23:00 Romania time.
+  #
+  # GitHub cron is ALWAYS UTC and does not follow daylight saving, while Romania
+  # does (EET = UTC+2 in winter, EEST = UTC+3 in summer). One fixed expression
+  # therefore cannot be 23:00 all year:
+  #
+  #   20:00 UTC  ->  23:00 EEST (summer, in effect now)  /  22:00 EET (winter)
+  #
+  # Change to '0 21 * * *' at the October clock change to stay on 23:00, and
+  # back to '0 20 * * *' in March.
+  schedule:
+    - cron: '0 20 * * *'
   workflow_dispatch:
     inputs:
       suite:
         description: Which tests to run
         type: choice
-        options: [smoke, full]
+        options: [smoke, full, coach-me]
         default: smoke
 
 # One run per ref; cancel superseded runs.
@@ -39,7 +48,10 @@ jobs:
   test:
     name: E2E (${{ github.event.inputs.suite || 'smoke' }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # The Coach Me answer suites alone are ~36 real AI runs (~20 min), and CI
+    # sets retries: 2, so a handful of failures triples their cost. 45 min was
+    # not enough headroom for a nightly that must finish.
+    timeout-minutes: 90
     env:
       # Map repository secrets to the env vars the suite reads.
       EMAIL: ${{ secrets.AICOACH_EMAIL }}
@@ -65,15 +77,37 @@ jobs:
       - name: Install Playwright browser (Chromium)
         run: npx playwright install --with-deps chromium
 
+      # Without credentials every credentialed test calls test.skip(), so the
+      # run would report success while asserting nothing - a nightly that is
+      # green because it did no work is worse than one that is red. Fail loudly
+      # instead.
+      - name: Verify credentials are configured
+        run: |
+          if [ -z "$EMAIL" ] || [ -z "$PASSWORD" ]; then
+            echo "::error::AICOACH_EMAIL / AICOACH_PASSWORD repository secrets are not set."
+            echo "::error::Without them every credentialed test skips and this run would pass without testing anything."
+            echo "Set them under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "Credentials present for ${EMAIL%%@*}@..."
+
       - name: Run tests
         run: |
-          if [ "${{ github.event.inputs.suite }}" = "full" ]; then
-            echo "Running FULL suite"
-            npx playwright test
-          else
-            echo "Running SMOKE suite (excluding mutating chat-creation tests)"
-            npx playwright test --grep-invert "should create a"
-          fi
+          case "${{ github.event.inputs.suite }}" in
+            full)
+              echo "Running FULL suite (includes mutating chat-creation tests)"
+              npx playwright test
+              ;;
+            coach-me)
+              echo "Running COACH ME suites only"
+              npm run test:coach-me:everything
+              ;;
+            *)
+              # Also the path taken by push, pull_request and the nightly cron.
+              echo "Running SMOKE suite (excluding mutating chat-creation tests)"
+              npx playwright test --grep-invert "should create a"
+              ;;
+          esac
 
       - name: Upload HTML report
         if: ${{ !cancelled() }}
