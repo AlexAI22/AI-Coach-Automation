@@ -96,7 +96,10 @@ export class CustomerAccountPage {
     this.keyContactsCard = this.teamCards.filter({ hasText: 'Key Customer Contacts' });
 
     this.tabs = page.locator('[data-sentry-component="Tabs"]');
-    this.opportunities = page.locator('[data-sentry-component="Opportunities"]');
+    // The app currently renders the list as "OpportunitiesLegacy"; match the
+    // prefix so both that and a future "Opportunities" component are found
+    // (same approach as expansionPlanArea below). Only one renders at a time.
+    this.opportunities = page.locator('[data-sentry-component^="Opportunities"]');
     // Each opportunity is a direct child card of the Opportunities container.
     this.opportunityCards = this.opportunities.locator(':scope > div');
     this.coachMeButtons = this.opportunities.getByRole('button', { name: 'Coach Me' });
@@ -180,9 +183,66 @@ export class CustomerAccountPage {
     return this.kpiCards.filter({ hasText: title });
   }
 
-  /** A tab button located by its label. */
+  /**
+   * A tab button located by its label.
+   *
+   * `exact` matters: accessible-name matching is substring-based by default, and
+   * the strip now carries both "Opportunities" and "Opportunities (new)", so a
+   * loose match on "Opportunities" resolves to two elements and fails strict mode.
+   */
   tab(name: string): Locator {
-    return this.tabs.getByRole('button', { name });
+    return this.tabs.getByRole('button', { name, exact: true });
+  }
+
+  /** An opportunity card on the Opportunities tab, located by its title. */
+  opportunityCard(title: string): Locator {
+    return this.opportunityCards.filter({ hasText: title });
+  }
+
+  /**
+   * The expansion plan cards. ExpansionPlanList renders an intro paragraph plus
+   * a single wrapper div holding the cards, so the cards are grandchildren —
+   * `:scope > div` would match the wrapper, not the cards.
+   */
+  get expansionPlanCards(): Locator {
+    return this.expansionPlanList.locator(':scope > div > div');
+  }
+
+  /** Opens the Expansion Plan tab and waits for the (async) plan list. */
+  async openExpansionPlanTab(): Promise<void> {
+    await this.openTab('Expansion Plan');
+    await this.expansionPlanList.waitFor({ state: 'visible', timeout: 60000 });
+    await this.expansionPlanCards.first().waitFor({ state: 'visible', timeout: 30000 });
+  }
+
+  /** Opens the Expansion Coach modal for the nth expansion plan (0-based). */
+  async openExpansionCoachMe(index: number): Promise<void> {
+    await this.expansionPlanCards.nth(index).getByRole('button', { name: 'Coach Me' }).click();
+  }
+
+  /** The single Coach Me button at the foot of the Account Roadmap tab. */
+  get accountRoadmapCoachMeButton(): Locator {
+    return this.accountRoadmap.getByRole('button', { name: 'Coach Me' });
+  }
+
+  /** Opens the Account Roadmap tab and waits for its content. */
+  async openAccountRoadmapTab(): Promise<void> {
+    await this.openTab('Account Roadmap');
+    await this.accountRoadmap.waitFor({ state: 'visible', timeout: 60000 });
+    await this.accountRoadmapCoachMeButton.waitFor({ state: 'visible', timeout: 30000 });
+  }
+
+  /** Opens the "Account Roadmap Coach" modal. */
+  async openRoadmapCoachMe(): Promise<void> {
+    await this.accountRoadmapCoachMeButton.click();
+  }
+
+  /**
+   * Opens the AI Coach modal for an opportunity via its "Coach Me" button.
+   * Assert on the modal with CoachMeModalPage afterwards.
+   */
+  async openCoachMe(opportunityTitle: string): Promise<void> {
+    await this.opportunityCard(opportunityTitle).getByRole('button', { name: 'Coach Me' }).click();
   }
 
   /** Whether the given tab button is the active one (rose underline accent). */
