@@ -31,9 +31,10 @@ const PROMPTS = CoachMeModalPage.SUGGESTED_QUESTIONS;
 const MIN_ANSWER_LENGTH = 200;
 
 test.describe(`Coach Me answers — ${CUSTOMER.name} / ${OPPORTUNITY}`, () => {
-  // Serial: every prompt shares the one modal, and each clears the previous
-  // conversation before asking, so they must not interleave.
-  test.describe.configure({ mode: 'serial' });
+  // Default (not serial): each prompt is independent, so one failing prompt must
+  // not hide the ones after it. Under serial, a single content gap on prompt 7
+  // silently skipped prompt 8 entirely.
+  test.describe.configure({ mode: 'default' });
 
   let account: CustomerAccountPage;
   let coach: CoachMeModalPage;
@@ -49,11 +50,19 @@ test.describe(`Coach Me answers — ${CUSTOMER.name} / ${OPPORTUNITY}`, () => {
     await coach.waitForOpen();
   });
 
-  test.beforeEach(() => {
+  // Self-healing: a prompt that failed mid-answer would otherwise leave the
+  // modal closed or the conversation dirty and break every prompt after it.
+  test.beforeEach(async () => {
     test.skip(
       !hasCredentials(),
       'Credentials must be set (AICoach_MICROSOFT_EMAIL/AICoach_MICROSOFT_PASSWORD or EMAIL/PASSWORD)',
     );
+
+    if (!(await coach.panel.isVisible().catch(() => false))) {
+      await account.openTab('Opportunities');
+      await account.openCoachMe(OPPORTUNITY);
+      await coach.waitForOpen();
+    }
   });
 
   for (const [index, promptText] of PROMPTS.entries()) {

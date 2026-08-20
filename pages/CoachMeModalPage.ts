@@ -67,7 +67,7 @@ export class CoachMeModalPage {
    * words like "error" or "unable to" legitimately occur in coaching prose.
    */
   static readonly FAILURE_MARKERS =
-    /something went wrong|an error occurred|failed to generate|please try again|service unavailable|rate limit|internal server error/i;
+    /something went wrong|an error occurred|failed to generate|please try again|service unavailable|rate limit|internal server error|is not yet available|has not been loaded/i;
 
   /**
    * The suggested-question prompts offered for an opportunity, in render order.
@@ -75,14 +75,30 @@ export class CoachMeModalPage {
    * every opportunity, not customer-specific.
    */
   static readonly SUGGESTED_QUESTIONS = [
-    'Can you draft a Pursuit Plan for this opportunity?',
-    'Can you draft Deal Plan discovery questions to qualify this opportunity?',
-    'How should I position this opportunity in my next conversation?',
-    'What objections should I expect and how do I handle them?',
-    'What is the best way to move this to the next sales stage?',
-    'How do I build urgency around this opportunity?',
-    'What proof points or case studies should I bring up?',
+    'What are the client outcomes / deliverables from this opportunity?',
+    'Why is this opportunity recommended for this client?',
+    // NOTE: a curly apostrophe (U+2019) in "we’ve" — not a straight quote.
+    'How should I pitch this as a continuation of the roadmap we’ve developed for my client?',
+    'How should I write an email to introduce this opportunity?',
+    'What objections might the client raise and how should I respond?',
+    'Can you help me draft a blue sheet for this opportunity?',
+    'How should I engage with Microsoft for this offer?',
+    'What do I need to do to get Microsoft funding for this opportunity?',
   ];
+
+  /**
+   * The PREVIOUS opportunity prompt set, replaced wholesale by the app in
+   * Aug 2026 (7 prompts -> the 8 above; every one reworded). Kept only as a
+   * record of what the suite used to assert — nothing references it.
+   *
+   *   Can you draft a Pursuit Plan for this opportunity?
+   *   Can you draft Deal Plan discovery questions to qualify this opportunity?
+   *   How should I position this opportunity in my next conversation?
+   *   What objections should I expect and how do I handle them?
+   *   What is the best way to move this to the next sales stage?
+   *   How do I build urgency around this opportunity?
+   *   What proof points or case studies should I bring up?
+   */
 
   /**
    * The suggested questions offered by the "Expansion Coach" modal, opened from

@@ -6,20 +6,20 @@
 # 1:1 onto a test case, so the counts here match `--list`.
 #
 #   Feature                  Spec                                        Cases  Runtime
-#   Opportunities prompts    tests/coachMeOpportunities.spec.ts             15   ~20s
-#   Opportunities answers    tests/coachMeOpportunitiesAnswers.spec.ts       7   ~4m
+#   Opportunities prompts    tests/coachMeOpportunities.spec.ts             16   ~20s
+#   Opportunities answers    tests/coachMeOpportunitiesAnswers.spec.ts       8   ~5m
 #   Expansion Plan prompts   tests/expansionPlanCoachMe.spec.ts              8   ~13s
 #   Expansion Plan answers   tests/expansionPlanCoachMeAnswers.spec.ts       5   ~8.7m
 #   Account Roadmap prompts  tests/accountRoadmapCoachMe.spec.ts            17   ~12s
 #   Account Roadmap answers  tests/accountRoadmapCoachMeAnswers.spec.ts      8   ~6.5m
-#                                                                  total    60
+#                                                                  total    62
 #
 # The "prompts" features check TEXT ONLY and click nothing, so they trigger no
-# AI run (40 cases, ~24s combined). The "answers" features each trigger real AI
-# runs (35 in total, ~20 minutes), which is why they are separate specs.
+# AI run (41 cases, ~40s combined). The "answers" features each trigger real AI
+# runs (36 in total, ~20 minutes), which is why they are separate specs.
 #
-#   npm run test:coach-me:all         # the three prompts specs (40 cases)
-#   npm run test:coach-me:answers     # the three answers specs (35 AI runs)
+#   npm run test:coach-me:all         # the three prompts specs (41 cases)
+#   npm run test:coach-me:answers     # the three answers specs (36 AI runs)
 #   npm run test:coach-me:everything  # all six, one login
 #
 # ----------------------------------------------------------------------------
@@ -41,14 +41,25 @@
 #  1. THREE Coach Me variants exist and every one differs:
 #
 #       Section          Modal title                  Prompts  Context banner  Buttons
-#       Opportunities    "AI Coach — <opportunity>"         7  yes             1 per card
+#       Opportunities    "AI Coach — <opportunity>"         8  yes             1 per card
 #       Expansion Plan   "Expansion Coach — <plan>"         4  no              1 per card (5)
 #       Account Roadmap  "Account Roadmap Coach"            8  no              1 for the tab
 #
-#     Account Roadmap is the only title with no trailing subject. Negative
-#     checks confirm the three prompt sets cannot be confused: asserting the
-#     expansion set against the roadmap modal fails (expected 4, received 8),
-#     and the opportunity set fails (expected 7, received 8).
+#     Account Roadmap is the only title with no trailing subject. The three sets
+#     share no prompt text, so a negative check asserting one set against
+#     another modal fails on text even where the counts now coincide
+#     (Opportunities and Account Roadmap are both 8).
+#
+#  1a. THE OPPORTUNITIES PROMPT SET WAS REPLACED WHOLESALE in Aug 2026: 7
+#      prompts became 8, and every one was reworded (nothing carried over).
+#      The suite caught it as a hard failure, which is what it is for. At the
+#      same time the tab strip gained an "Opportunities (new)" tab, so a feature
+#      rollout looks likely and this set may move again. The old set is recorded
+#      in a comment on CoachMeModalPage.SUGGESTED_QUESTIONS.
+#      Because "Opportunities" and "Opportunities (new)" both start with the
+#      same words and accessible-name matching is substring-based, the tab
+#      locator must match EXACTLY or every tab click hits a strict-mode
+#      violation.
 #
 #  2. CLICKING A PROMPT DOES NOT ASK IT. It only fills the "Ask a custom
 #     question" input, which is what enables the "Ask" button. The question is
@@ -74,7 +85,7 @@
 
 
 # ----------------------------------------------------------------------------
-# tests/coachMeOpportunities.spec.ts — 15 cases, ~20s. Prompt text only; nothing is clicked.
+# tests/coachMeOpportunities.spec.ts — 16 cases, ~20s. Prompt text only; nothing is clicked.
 # ----------------------------------------------------------------------------
 Feature: Coach Me - Opportunities suggested question prompts
   As an authenticated AI Coach user
@@ -100,33 +111,35 @@ Feature: Coach Me - Opportunities suggested question prompts
     And it should show the "Suggested Questions" header
     And it should offer a control to close the panel
 
-  Scenario: Display exactly seven suggested question prompts
-    Then exactly 7 suggested question prompts should be displayed
+  Scenario: Display exactly eight suggested question prompts
+    Then exactly 8 suggested question prompts should be displayed
 
   Scenario: Display every suggested question prompt verbatim and in order
     Then the suggested question prompts should read, in order:
-      | # | prompt                                                                   |
-      | 1 | Can you draft a Pursuit Plan for this opportunity?                       |
-      | 2 | Can you draft Deal Plan discovery questions to qualify this opportunity? |
-      | 3 | How should I position this opportunity in my next conversation?          |
-      | 4 | What objections should I expect and how do I handle them?                |
-      | 5 | What is the best way to move this to the next sales stage?               |
-      | 6 | How do I build urgency around this opportunity?                          |
-      | 7 | What proof points or case studies should I bring up?                     |
+      | # | prompt                                                                                  |
+      | 1 | What are the client outcomes / deliverables from this opportunity?                      |
+      | 2 | Why is this opportunity recommended for this client?                                    |
+      | 3 | How should I pitch this as a continuation of the roadmap we’ve developed for my client? |
+      | 4 | How should I write an email to introduce this opportunity?                              |
+      | 5 | What objections might the client raise and how should I respond?                        |
+      | 6 | Can you help me draft a blue sheet for this opportunity?                                |
+      | 7 | How should I engage with Microsoft for this offer?                                      |
+      | 8 | What do I need to do to get Microsoft funding for this opportunity?                     |
 
   Scenario Outline: Display the suggested question prompt "<prompt>"
     Then the prompt "<prompt>" should be displayed
     And the prompt "<prompt>" should be enabled
 
     Examples:
-      | prompt                                                                   |
-      | Can you draft a Pursuit Plan for this opportunity?                       |
-      | Can you draft Deal Plan discovery questions to qualify this opportunity? |
-      | How should I position this opportunity in my next conversation?          |
-      | What objections should I expect and how do I handle them?                |
-      | What is the best way to move this to the next sales stage?               |
-      | How do I build urgency around this opportunity?                          |
-      | What proof points or case studies should I bring up?                     |
+      | prompt                                                                                  |
+      | What are the client outcomes / deliverables from this opportunity?                      |
+      | Why is this opportunity recommended for this client?                                    |
+      | How should I pitch this as a continuation of the roadmap we’ve developed for my client? |
+      | How should I write an email to introduce this opportunity?                              |
+      | What objections might the client raise and how should I respond?                        |
+      | Can you help me draft a blue sheet for this opportunity?                                |
+      | How should I engage with Microsoft for this offer?                                      |
+      | What do I need to do to get Microsoft funding for this opportunity?                     |
 
   Scenario: Render no empty and no duplicate prompts
     Then no suggested question prompt should be blank
@@ -140,12 +153,12 @@ Feature: Coach Me - Opportunities suggested question prompts
     When I close the Suggested Questions panel
     Then the Suggested Questions panel should no longer be shown
     When I reopen it via the "Suggested Questions" toggle
-    Then all 7 prompts should be displayed again, verbatim and in order
+    Then all 8 prompts should be displayed again, verbatim and in order
 
   Scenario: Display the same prompts after the modal is closed and reopened
     When I close the modal
     And I click "Coach Me" on the "Foundation Frontier Assessment" opportunity again
-    Then all 7 prompts should be displayed again, verbatim and in order
+    Then all 8 prompts should be displayed again, verbatim and in order
 
   # Notes:
   #  - The cases run serially against ONE modal opened by the first scenario, so
@@ -156,7 +169,7 @@ Feature: Coach Me - Opportunities suggested question prompts
 
 
 # ----------------------------------------------------------------------------
-# tests/coachMeOpportunitiesAnswers.spec.ts — 7 cases (7 AI runs), ~4m.
+# tests/coachMeOpportunitiesAnswers.spec.ts — 8 cases (8 AI runs), ~5m.
 # ----------------------------------------------------------------------------
 Feature: Coach Me - Opportunities answers
   As an authenticated AI Coach user
@@ -184,14 +197,15 @@ Feature: Coach Me - Opportunities answers
     And no HTTP 4xx or 5xx errors should have occurred during the run
 
     Examples:
-      | prompt                                                                   |
-      | Can you draft a Pursuit Plan for this opportunity?                       |
-      | Can you draft Deal Plan discovery questions to qualify this opportunity? |
-      | How should I position this opportunity in my next conversation?          |
-      | What objections should I expect and how do I handle them?                |
-      | What is the best way to move this to the next sales stage?               |
-      | How do I build urgency around this opportunity?                          |
-      | What proof points or case studies should I bring up?                     |
+      | prompt                                                                                  |
+      | What are the client outcomes / deliverables from this opportunity?                      |
+      | Why is this opportunity recommended for this client?                                    |
+      | How should I pitch this as a continuation of the roadmap we’ve developed for my client? |
+      | How should I write an email to introduce this opportunity?                              |
+      | What objections might the client raise and how should I respond?                        |
+      | Can you help me draft a blue sheet for this opportunity?                                |
+      | How should I engage with Microsoft for this offer?                                      |
+      | What do I need to do to get Microsoft funding for this opportunity?                     |
 
   # Notes:
   #  - Answers are non-deterministic prose, so only properties that must hold
@@ -199,22 +213,31 @@ Feature: Coach Me - Opportunities answers
   #    for human review, and grounding signals are logged, not asserted.
   #  - This suite does NOT clear the chat after each answer (unlike the two
   #    below); it clears BEFORE each question instead.
-  #  - Observed behaviour (full run, all 7 passing):
-  #      1 Pursuit Plan            ~67s  ~6.1k chars  names the customer
-  #      2 Deal Plan discovery     ~12s  ~0.3k chars  asks a clarifying question
-  #      3 Position in convo       ~29s  ~6.3k chars  names the customer
-  #      4 Objections              ~27s  ~5.1k chars  names the customer
-  #      5 Next sales stage        ~28s  ~6.0k chars  names the customer
-  #      6 Build urgency           ~29s  ~5.9k chars  names the customer
-  #      7 Proof points            ~28s  ~5.9k chars  names the customer
-  #  - Prompt 2 is the OUTLIER: it replies with "What should I build from for
-  #    Discovery Questions?" instead of content, i.e. it needs a follow-up turn.
-  #    Reproduced on two separate runs, so it is deterministic, not a blip.
-  #    OPEN QUESTION for the product team: is clarify-first intended here?
-  #  - Prompt 1 also ends by offering a second turn ("Reply 'yes' when you want
-  #    the full Pursuit Plan document"), but delivers substantial content first.
-  #  - "Answer mentions the customer" is therefore NOT asserted: it holds for 6
-  #    of 7 prompts and would false-fail on prompt 2.
+  #  - Observed behaviour against the NEW 8-prompt set (7 passed, 1 failed):
+  #      1 client outcomes         ~19s   ~3.6k chars  names the customer
+  #      2 why recommended         ~22s   ~5.3k chars  names the customer
+  #      3 pitch as continuation   ~25s   ~5.8k chars  names the customer
+  #      4 intro email             ~15s   ~1.1k chars  names the customer
+  #      5 objections              ~24s   ~5.7k chars  names the customer
+  #      6 blue sheet              ~35s  ~10.2k chars  names the customer
+  #      7 engage with Microsoft   ~12s   ~0.1k chars  FAILS - see below
+  #      8 Microsoft funding       ~12s   ~0.3k chars  terse but valid
+  #
+  #  - KNOWN FAILURE, prompt 7 ("How should I engage with Microsoft for this
+  #    offer?"). The app answers:
+  #        "Guidance for engaging with Microsoft for this offer is not yet
+  #         available. The required Advisory Motion training content has not
+  #         been loaded."
+  #    That is a CONTENT GAP on staging, not a test defect, so the assertion is
+  #    deliberately left failing rather than weakened - the phrasing is also in
+  #    FAILURE_MARKERS so the failure names the cause instead of just reporting
+  #    "answer too short". Remove nothing here; it should pass by itself once
+  #    the Advisory Motion content is loaded.
+  #
+  #  - Prompt 8 is terse (~279 chars) but a legitimate status answer about the
+  #    Partner Funding team, so it clears the 200-character floor honestly.
+  #  - "Answer mentions the customer" is NOT asserted: it holds for 6 of 8
+  #    prompts (7 and 8 answer generically) and would false-fail on those.
 
 
 # ----------------------------------------------------------------------------
@@ -502,7 +525,7 @@ Feature: Coach Me - Account Roadmap answers
   #      Q7 present roadmap back  ~38s   ~8.1k chars
   #      Q8 handle pushback       ~41s   ~8.2k chars
   #    Every question returns substantial content — unlike the Opportunities
-  #    set, where prompt 2 replies with a clarifying question instead.
+  #    set, where prompt 7 currently fails on a staging content gap.
   #  - Roadmap answers are the LONGEST and SLOWEST of the three sections
   #    (6.5-12.6k chars, 33-54s vs 2.7-8.8k and 16-30s for Expansion Plan),
   #    consistent with the coach drawing on all four context accordions. Useful
