@@ -8,8 +8,10 @@ import { Page, Locator, expect } from '@playwright/test';
  *   Positioner (fixed overlay)
  *     Panel
  *       Title                -> "AI Coach — <opportunity>" + "Close modal" X
- *       SuggestedPrepSteps   -> "Suggested Questions" header, a "Close suggested
- *                               questions" X, and one button per prompt
+ *       SuggestedPrepSteps   -> a "Suggested Questions" disclosure header (a
+ *                               button carrying aria-expanded plus a chevron),
+ *                               a "Close suggested questions" X, and one
+ *                               button per prompt
  *       ContextBanner        -> "Session ready · <customer>"
  *       Body                 -> the conversation area
  *       Footer / QuestionInput -> "Ask a custom question:" input + "Ask" button
@@ -29,6 +31,11 @@ export class CoachMeModalPage {
   readonly suggestedQuestions: Locator;
   /** The "Suggested Questions" header label inside that panel. */
   readonly suggestedQuestionsHeader: Locator;
+  /**
+   * The panel's own header row, which is a disclosure BUTTON: it carries
+   * aria-expanded and a chevron, and its only text is the header label.
+   */
+  readonly suggestedQuestionsDisclosure: Locator;
   /** The X that collapses the side panel. */
   readonly closeSuggestedQuestionsButton: Locator;
   /**
@@ -39,8 +46,17 @@ export class CoachMeModalPage {
   readonly suggestedQuestionsToggle: Locator;
 
   /**
-   * The suggested-question prompt buttons, in render order. The only other
-   * button in the panel is the collapse X, which carries an aria-label.
+   * The suggested-question prompt buttons, in render order.
+   *
+   * TWO other buttons live in the panel and must stay out of this list:
+   *   - the "Suggested Questions" disclosure header -> has aria-expanded
+   *   - the collapse X                              -> has an aria-label
+   *
+   * Excluding aria-label alone used to be enough. The disclosure header has
+   * neither an aria-label nor a data-sentry-component of its own, so once the
+   * app made the header row a button it silently joined this list and every
+   * toHaveText(EXPECTED_PROMPTS) failed with "Suggested Questions" prepended
+   * to the received array. The prompt buttons carry neither attribute.
    */
   readonly prompts: Locator;
 
@@ -144,11 +160,15 @@ export class CoachMeModalPage {
     this.closeSuggestedQuestionsButton = this.suggestedQuestions.getByRole('button', {
       name: 'Close suggested questions',
     });
+    // Restricted to buttons OUTSIDE SuggestedPrepSteps: the panel's own
+    // disclosure header also reads "Suggested Questions", so a Panel-wide text
+    // match resolves to two elements and fails strict mode on click.
     this.suggestedQuestionsToggle = this.panel
-      .locator('button')
+      .locator('button:not([data-sentry-component="SuggestedPrepSteps"] *)')
       .filter({ hasText: /^\s*(hide|suggested questions)\s*$/i });
 
-    this.prompts = this.suggestedQuestions.locator('button:not([aria-label])');
+    this.suggestedQuestionsDisclosure = this.suggestedQuestions.locator('button[aria-expanded]');
+    this.prompts = this.suggestedQuestions.locator('button:not([aria-expanded]):not([aria-label])');
 
     this.contextBanner = page.locator('[data-sentry-component="ContextBanner"]');
     this.body = page.locator('[data-sentry-component="Body"]');

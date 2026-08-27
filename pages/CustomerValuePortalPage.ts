@@ -1,4 +1,5 @@
 import { Page, Locator, expect } from '@playwright/test';
+import { CUSTOMER_ACCOUNT_PATH, CUSTOMER_VALUE_PORTAL_PATH } from '../support/routes';
 
 /**
  * Customer Value Portal (https://.../customer-value-portal).
@@ -76,7 +77,7 @@ export class CustomerValuePortalPage {
 
   /** Navigate to the Customer Value Portal. */
   async goto(): Promise<void> {
-    await this.page.goto('/customer-value-portal', { waitUntil: 'domcontentloaded' });
+    await this.page.goto(CUSTOMER_VALUE_PORTAL_PATH, { waitUntil: 'domcontentloaded' });
   }
 
   /**
@@ -174,7 +175,7 @@ export class CustomerValuePortalPage {
     const row = this.rows.nth(index);
     const name = ((await this.nameOf(row).textContent()) ?? '').trim();
     await row.click();
-    await this.page.waitForURL(/\/customer-value-portal\/account/);
+    await this.page.waitForURL(new RegExp(CUSTOMER_ACCOUNT_PATH));
     return name;
   }
 

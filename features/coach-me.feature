@@ -32,8 +32,18 @@
 #    before any interaction, as it overlays the page and intercepts clicks.
 #  - The account view intermittently mounts an empty page body (hydration/data
 #    race); the automation reloads until the header renders.
+#  - All scenarios reach the account page by DEEP LINK, and that route MOVED in
+#    Aug 2026 to /customer-value-portal/customer (it was /account). The old path
+#    does not 404 — the app keeps the URL and renders the portal LIST in its
+#    place, so the only symptom is the account heading never appearing while the
+#    URL still looks correct. The path lives in CustomerAccountPage.PATH.
 #  - All scenarios run against customer "Ballyvesey Industries Ltd"
-#    (GGP ID 0009626222).
+#    (GGP ID 0009626222), which exists ONLY in the Demo Mode sample data set —
+#    the staging account has no real customers, and Demo Mode is not carried by
+#    playwright/.auth/user.json (that file holds only the PropelAuth cookies and
+#    their localStorage). A deep link therefore also bounces to the list when
+#    Demo Mode is off, so CustomerAccountPage.goto() switches it on through the
+#    portal and retries — a guard that keeps each spec runnable on its own.
 #
 # ----------------------------------------------------------------------------
 # Cross-cutting behaviour, verified against staging
@@ -81,6 +91,14 @@
 #  6. The Suggested Questions panel collapses to zero width rather than
 #     unmounting, and its children keep a layout box, so "hidden" is asserted on
 #     the panel container, not on the individual prompt buttons.
+#
+#  7. THE PANEL HEADER ROW IS ITSELF A BUTTON. "Suggested Questions" is rendered
+#     as a disclosure control (aria-expanded + a chevron), not as a plain label,
+#     and it sits inside SuggestedPrepSteps alongside the prompts. It carries
+#     neither an aria-label nor a data-sentry-component of its own, so a prompt
+#     locator that only excluded aria-labelled buttons let the header in and the
+#     prompt assertions received "Suggested Questions" as an extra first entry.
+#     CoachMeModalPage.prompts therefore excludes aria-expanded as well.
 # ============================================================================
 
 

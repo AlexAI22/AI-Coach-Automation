@@ -200,7 +200,7 @@ test.describe('Customer Value Portal — Account navigation (reused session)', (
 
   test('should open the account page when a customer row is clicked', async ({ page }) => {
     const name = await cvp.openCustomer(0);
-    await expect(page).toHaveURL(/\/customer-value-portal\/account\?id=\d+/);
+    await expect(page).toHaveURL(new RegExp(`${CustomerAccountPage.PATH}\\?id=\\d+`));
     await expect(account.heading).toHaveText(name);
     await expect(account.customerId).toContainText(/ID:\s*\d+/);
     await expect(account.customersLink).toHaveAttribute('href', '/customer-value-portal');
@@ -247,7 +247,9 @@ for (const customer of ACCOUNTS) {
     });
 
     test('should show the account header with the customer name and ID', async () => {
-      await expect(account.page).toHaveURL(new RegExp(`/customer-value-portal/account\\?id=${customer.id}`));
+      await expect(account.page).toHaveURL(
+        new RegExp(`${CustomerAccountPage.PATH}\\?id=${customer.id}`),
+      );
       await expect(account.heading).toHaveText(customer.name);
       await expect(account.customerId).toContainText(/ID:\s*\d+/);
       await expect(account.customersLink).toHaveAttribute('href', '/customer-value-portal');

@@ -1,8 +1,10 @@
 import { Page, Locator, expect } from '@playwright/test';
+import { CustomerValuePortalPage } from './CustomerValuePortalPage';
+import { CUSTOMER_ACCOUNT_PATH } from '../support/routes';
 
 /**
  * Customer account detail page
- * (https://.../customer-value-portal/account?id=<id>&id_type=SourceGGP).
+ * (https://.../customer-value-portal/customer?id=<id>&id_type=SourceGGP).
  *
  * Reached by clicking a customer row on the Customer Value Portal. Layout: a
  * breadcrumb + title header with a currency <select>, four KPI cards, a
@@ -58,6 +60,14 @@ export class CustomerAccountPage {
     'L12M Booked Insight-Delivered Services Revenue',
     'Renewal Dates',
   ];
+
+  /**
+   * Route the app serves the customer account detail page from. Re-exported
+   * from support/routes.ts so specs can keep saying CustomerAccountPage.PATH
+   * while the portal page object reads the same constant without importing this
+   * class back (that would be a cycle).
+   */
+  static readonly PATH = CUSTOMER_ACCOUNT_PATH;
 
   /** The tab strip labels, in render order. */
   static readonly TAB_NAMES = [
@@ -144,21 +154,69 @@ export class CustomerAccountPage {
    * Navigate directly to a customer's account page. The app addresses accounts
    * by `id` + `id_type=SourceGGP` (not `ggp_id`). Defaults to the stable demo
    * customer (Inflexion Buyout V Investments LP).
+   *
+   * THE ROUTE MOVED (Aug 2026): the detail page is served from
+   * /customer-value-portal/CUSTOMER, not /account. The old path does not 404 —
+   * the app keeps the URL and renders the portal LIST in its place, which
+   * carries no AccountTitle, so the only symptom was this heading timing out
+   * while the browser looked, by its URL, to be on the right page. The path
+   * lives in CustomerAccountPage.PATH so the next rename is one line.
+   *
+   * Secondary precondition, kept as a guard rather than as a diagnosis: the
+   * staging account has no real customers, so every customer this suite uses —
+   * Ballyvesey included — exists only in the DEMO MODE sample set, and Demo
+   * Mode is not carried by playwright/.auth/user.json (that file holds only the
+   * PropelAuth cookies and their localStorage). A deep link therefore also
+   * bounces to the list when Demo Mode is off, which the recovery below covers
+   * so each spec stays runnable in isolation. It costs nothing when the account
+   * page loads normally.
    */
   async goto(id = '0009623781'): Promise<void> {
-    const url = `/customer-value-portal/account?id=${id}&id_type=SourceGGP`;
-    // The account view intermittently mounts an empty <main> (hydration/data
-    // race), so reload until the header renders. A short pause between reloads
-    // eases the intermittent staging throttling.
+    const url = `${CustomerAccountPage.PATH}?id=${id}&id_type=SourceGGP`;
+    const portal = new CustomerValuePortalPage(this.page);
+    // ensureCustomersLoaded() is slow (it waits out the list endpoint), so it
+    // gets ONE shot rather than one per reload — six of them would outlast the
+    // callers' test timeouts.
+    let demoModeRecovered = false;
+
+    // The account view also intermittently mounts an empty <main> (hydration/
+    // data race), so reload until the header renders. A short pause between
+    // reloads eases the intermittent staging throttling.
     for (let attempt = 0; attempt < 6; attempt++) {
       await this.page.goto(url, { waitUntil: 'domcontentloaded' });
       await this.dismissWelcomeDialog();
       if (await this.heading.isVisible({ timeout: 8000 }).catch(() => false)) {
         return;
       }
+
+      // The portal's h1 renders only on the list page, so it is the signal that
+      // the deep link was bounced rather than merely slow.
+      const bounced = await portal.heading.isVisible({ timeout: 5000 }).catch(() => false);
+      if (bounced && !demoModeRecovered) {
+        demoModeRecovered = true;
+        // If the portal list itself will not load, no account page can render,
+        // so stop and report that rather than spending five more reloads on it.
+        const loaded = await portal.ensureCustomersLoaded().then(
+          () => true,
+          () => false,
+        );
+        if (!loaded) break;
+        continue;
+      }
+
       await this.page.waitForTimeout(1000);
     }
-    await this.heading.waitFor({ state: 'visible', timeout: 15000 });
+
+    // Web-first assertion rather than a bare waitFor, so the failure names
+    // where the browser actually ended up instead of just the missing heading.
+    await expect(
+      this.heading,
+      `The account page for customer ${id} never rendered; the browser is at ${this.page.url()}. ` +
+        'If the portal LIST is on screen at that URL, the app served its fallback: either ' +
+        `CustomerAccountPage.PATH (${CustomerAccountPage.PATH}) is stale again, or the list ` +
+        'reads "Showing 0 of 0 customers" because Demo Mode is off and the sample customers ' +
+        '(this one included) do not exist for the staging account.',
+    ).toBeVisible({ timeout: 15000 });
   }
 
   /** Dismiss the first-run "Welcome to AI Coach" modal if it appears. */

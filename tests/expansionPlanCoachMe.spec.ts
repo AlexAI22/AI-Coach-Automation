@@ -91,6 +91,10 @@ test.describe(`Expansion Plan Coach Me prompts — ${CUSTOMER.name}`, () => {
         await expect(coach.title).toHaveText(`Expansion Coach — ${planTitle}`);
         await expect(coach.suggestedQuestionsHeader).toBeVisible();
 
+        // Count first, so an extra or missing button is reported as a count
+        // instead of as a text-and-order diff — the failure mode when the
+        // panel's disclosure header started matching the prompt locator.
+        await expect(coach.prompts).toHaveCount(EXPECTED_PROMPTS.length);
         // Text, count and order in one assertion.
         await expect(coach.prompts).toHaveText(EXPECTED_PROMPTS);
 

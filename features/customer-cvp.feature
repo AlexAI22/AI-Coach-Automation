@@ -112,7 +112,7 @@ Feature: Customer Value Portal
 
 
 # Account detail page, reached from the customer list
-# (https://.../customer-value-portal/account?id=<id>&id_type=SourceGGP).
+# (https://.../customer-value-portal/customer?id=<id>&id_type=SourceGGP).
 #
 # Additional preconditions:
 #  - The account view intermittently mounts an empty page body (hydration/data
@@ -134,7 +134,7 @@ Feature: Customer Value Portal - Account detail
   Scenario: Open the account page when a customer row is clicked
     Given I open the Customer Value Portal with Demo Mode customers loaded
     When I click the first customer row
-    Then the page URL should match "/customer-value-portal/account?id=<digits>"
+    Then the page URL should match "/customer-value-portal/customer?id=<digits>"
     And the account heading should show the clicked customer's name
     And the account should show a "GGP ID:" or "Customer ID:" value
     And the "Customers" breadcrumb should link to "/customer-value-portal"
