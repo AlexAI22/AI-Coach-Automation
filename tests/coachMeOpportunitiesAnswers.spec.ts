@@ -8,10 +8,12 @@ import { hasCredentials } from '../support/credentials';
  * Coach Me — running every suggested question and checking its answer.
  *
  * Flow per prompt: click the suggested question (which only fills the
- * custom-question input), press "Ask", then wait for the assistant's answer.
+ * custom-question input), press "Ask", wait for the assistant's answer, check
+ * it, wait 3s, then press "Clear chat" so the next prompt starts from an empty
+ * conversation.
  *
  * SEPARATE FROM coachMe.spec.ts ON PURPOSE. That suite only checks the prompts
- * are displayed and runs in ~20s; this one triggers seven real AI runs at
+ * are displayed and runs in ~20s; this one triggers eight real AI runs at
  * roughly 2-3 minutes each, so a full pass takes 20+ minutes. Keeping them apart
  * means the cheap checks stay cheap.
  *
@@ -29,6 +31,9 @@ const PROMPTS = CoachMeModalPage.SUGGESTED_QUESTIONS;
 
 /** A usable coaching answer is well past this; catches empty/stub responses. */
 const MIN_ANSWER_LENGTH = 200;
+
+/** Requested settle time between an answer landing and clearing the chat. */
+const SETTLE_AFTER_ANSWER_MS = 3000;
 
 test.describe(`Coach Me answers — ${CUSTOMER.name} / ${OPPORTUNITY}`, () => {
   // Default (not serial): each prompt is independent, so one failing prompt must
@@ -118,6 +123,13 @@ test.describe(`Coach Me answers — ${CUSTOMER.name} / ${OPPORTUNITY}`, () => {
       expect(answer.length, `Answer was too short to be usable: ${JSON.stringify(answer)}`)
         .toBeGreaterThan(MIN_ANSWER_LENGTH);
       expect(answer, 'Answer contains a failure marker').not.toMatch(CoachMeModalPage.FAILURE_MARKERS);
+
+      // Let the answer settle, then reset the conversation for the next prompt.
+      // "Clear chat" is an <a role="button"> in the coach toolbar rather than a
+      // <button>, which is why the page object locates it by ROLE.
+      await page.waitForTimeout(SETTLE_AFTER_ANSWER_MS);
+      await coach.clearChat();
+      await expect(coach.body).toContainText(CoachMeModalPage.EMPTY_STATE);
 
       expect(httpErrors, `Unexpected HTTP errors: ${JSON.stringify(httpErrors, null, 2)}`).toEqual([]);
     });
