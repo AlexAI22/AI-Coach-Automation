@@ -25,6 +25,7 @@ export class CustomerValuePortalPage {
 
   readonly tableHeader: Locator;
   readonly rows: Locator;
+  readonly skeletonRows: Locator;
 
   readonly pagination: Locator;
   readonly showingLabel: Locator;
@@ -55,16 +56,29 @@ export class CustomerValuePortalPage {
     this.description = page.getByText(/Manage and track your .*customer relationships/i).first();
     this.demoModeButton = page.getByRole('button', { name: 'Demo Mode' });
     this.currencySelect = page.locator('[data-sentry-component="CurrencySelect"] select');
-    // Located via the Search component rather than its placeholder: the copy has
+    // Located via the search component rather than its placeholder: the copy has
     // already changed once ("Search customers by name..." -> "Search by
     // customer's sold-to, RP, GP, or GGP name or ID number") and contains a
     // curly apostrophe, so matching on it is needlessly brittle.
-    this.searchInput = page.locator('[data-sentry-component="Search"] input');
+    //
+    // RENAMED (Aug 2026): the component is "SearchBar", it was "Search". Matched
+    // by PREFIX so both spellings resolve — the rename does not 404 or otherwise
+    // announce itself, it just makes the box unfindable and every search test
+    // hang on fill() until the test timeout.
+    this.searchInput = page.locator('[data-sentry-component^="Search"] input');
 
     this.tableHeader = page.locator('[data-sentry-component="TableHeader"]');
     this.rows = page.locator('[data-sentry-component="TableBody"]');
+    // Loading placeholders. They occupy the table while a list/search request
+    // is in flight, and they are ALSO the empty state when the account has no
+    // customers — so "rows === 0" alone never distinguishes "still loading"
+    // from "nothing matched". Assert on this too when that difference matters.
+    this.skeletonRows = page.locator('[data-sentry-component="SkeletonRow"]');
 
-    this.pagination = page.locator('[data-sentry-component="PaginationButtons"]');
+    // RENAMED (Aug 2026): "Pagination", was "PaginationButtons". Prefix-matched
+    // for the same reason as the search box above; it still holds the
+    // "Showing X of Y customers" label and the four page buttons.
+    this.pagination = page.locator('[data-sentry-component^="Pagination"]');
     this.showingLabel = this.pagination.getByText(/Showing\s+\d+\s+of\s+\d+/);
     this.firstPageButton = this.pagination.getByRole('button', { name: 'First page' });
     this.prevPageButton = this.pagination.getByRole('button', { name: 'Previous page' });
@@ -162,6 +176,39 @@ export class CustomerValuePortalPage {
     await expect(this.rows.first()).toBeVisible({ timeout: 30000 });
   }
 
+  /**
+   * Get the portal into its REAL (non-demo) state.
+   *
+   * The search endpoint queries the account's real customers; the Demo Mode
+   * sample set is a separate, client-side list that search does not touch, so a
+   * query typed with Demo Mode ON appears to do nothing. Tests that exercise
+   * search therefore turn it off first.
+   *
+   * The hydration guard is the same one ensureCustomersLoaded() uses and
+   * matters for the same reason: reading the toggle mid-hydration can report
+   * the server-rendered (inactive) class while the real state is on, and acting
+   * on that misread flips Demo Mode the wrong way.
+   */
+  async ensureDemoModeOff(): Promise<void> {
+    await this.dismissWelcomeDialog();
+    await this.demoModeButton.waitFor({ state: 'visible', timeout: 60000 });
+    await this.tableHeader.waitFor({ state: 'visible', timeout: 30000 });
+
+    if (await this.isDemoModeOn()) {
+      await this.demoModeButton.click();
+      await expect
+        .poll(() => this.isDemoModeOn(), { timeout: 15000 })
+        .toBe(false);
+    }
+
+    // Gate on the "Showing X of Y" label before handing back. It renders only
+    // once the list endpoint has answered, so waiting for it is what proves the
+    // page is hydrated — and a query typed into the (controlled) search input
+    // before that is silently dropped, which shows up later as a search that
+    // returned nothing rather than as an error here.
+    await expect(this.showingLabel).toBeVisible({ timeout: 60000 });
+  }
+
   /** The customer-name element within a given row. */
   nameOf(row: Locator): Locator {
     return row.locator('[data-sentry-component="Customer"] p').first();
@@ -203,13 +250,59 @@ export class CustomerValuePortalPage {
     return { shown: Number(m?.[1] ?? NaN), total: Number(m?.[2] ?? NaN) };
   }
 
-  /** Type into the search box (client-side filter). Empty string clears it. */
+  /**
+   * Type into the search box. Empty string clears it.
+   *
+   * The value is read back because this is a controlled React input on a page
+   * that hydrates late: a fill() that lands too early is wiped by the re-render
+   * and the query never reaches the endpoint, which then looks like "the search
+   * matched nothing" several assertions later.
+   */
   async search(query: string): Promise<void> {
     await this.searchInput.fill(query);
+    await expect(this.searchInput).toHaveValue(query);
   }
 
-  /** Select a display currency by its code (GBP/USD/EUR). */
+  /**
+   * Select a display currency by its code (GBP/USD/EUR) and wait for the
+   * customer list to come back.
+   *
+   * MEASURED against staging: changing the currency REFETCHES the list. The
+   * rows are swapped for SkeletonRow placeholders — so `rows` is genuinely 0 —
+   * for one to three seconds, and then re-render carrying the new symbol.
+   * Anything that asserts on a row straight after selecting is asserting on a
+   * detached element, and on the intermittently flaky list endpoint the refetch
+   * sometimes does not come back at all. That is how "should change the
+   * displayed currency symbol" failed with "element(s) not found" after a full
+   * 20 seconds of retrying.
+   *
+   * The recovery re-picks the currency because ensureCustomersLoaded() can
+   * bounce Demo Mode, which resets the selection.
+   */
   async selectCurrency(code: string): Promise<void> {
-    await this.currencySelect.selectOption(code);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      // selectOption can itself lose the element to a refetch already in
+      // flight; that is a retry, not a failure.
+      const picked = await this.currencySelect
+        .selectOption(code)
+        .then(() => true, () => false);
+
+      if (picked) {
+        const listReturned = await this.rows
+          .first()
+          .waitFor({ state: 'visible', timeout: 30000 })
+          .then(() => true, () => false);
+        if (listReturned) return;
+      }
+
+      await this.ensureCustomersLoaded();
+    }
+
+    await expect(
+      this.rows.first(),
+      `The customer list never came back after selecting ${code}. Changing the ` +
+        'currency refetches the list, so this means the refetch returned nothing ' +
+        'three times in a row.',
+    ).toBeVisible({ timeout: 20000 });
   }
 }

@@ -16,6 +16,12 @@ import { CUSTOMER_ACCOUNT_PATH } from '../support/routes';
 export class CustomerAccountPage {
   readonly page: Page;
 
+  /**
+   * Customer whose account page goto() last opened. Kept so the page object can
+   * reopen itself (see selectCurrency) without the caller passing the id again.
+   */
+  private openedCustomerId = '0009623781';
+
   readonly root: Locator;
   readonly accountTitle: Locator;
   readonly customersLink: Locator;
@@ -173,6 +179,7 @@ export class CustomerAccountPage {
    */
   async goto(id = '0009623781'): Promise<void> {
     const url = `${CustomerAccountPage.PATH}?id=${id}&id_type=SourceGGP`;
+    this.openedCustomerId = id;
     const portal = new CustomerValuePortalPage(this.page);
     // ensureCustomersLoaded() is slow (it waits out the list endpoint), so it
     // gets ONE shot rather than one per reload — six of them would outlast the
@@ -318,8 +325,46 @@ export class CustomerAccountPage {
     return /border-rose-600/.test(cls);
   }
 
-  /** Select a display currency by its code (GBP/USD/EUR). */
+  /**
+   * Select a display currency by its code (GBP/USD/EUR) and wait for the page
+   * to come back.
+   *
+   * MEASURED against staging: picking a currency UNMOUNTS THE WHOLE ACCOUNT
+   * VIEW. For a second or two there is no AccountPage, no AccountTitle, no KPI
+   * card and an empty <main>; it then remounts with the new currency applied.
+   * That remount is the same intermittent hydration/data race goto() already
+   * reloads through, so when it does not come back on its own this reopens the
+   * page and re-picks the currency.
+   *
+   * Without this, a caller asserting on the header straight after selecting
+   * fails with "element(s) not found" on a locator that is merely mid-remount —
+   * which is exactly how the account-currency test failed.
+   */
   async selectCurrency(code: string): Promise<void> {
-    await this.currencySelect.selectOption(code);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      // selectOption can itself lose the element to a remount already in
+      // flight; that is a retry, not a failure.
+      const picked = await this.currencySelect
+        .selectOption(code)
+        .then(() => true, () => false);
+
+      if (picked) {
+        const remounted = await this.currencySelect
+          .waitFor({ state: 'visible', timeout: 30000 })
+          .then(() => true, () => false);
+        if (remounted) return;
+      }
+
+      // The remount landed empty — reload and pick again. The selection is not
+      // assumed to survive the reload, which is why the loop re-selects.
+      await this.goto(this.openedCustomerId);
+    }
+
+    await expect(
+      this.currencySelect,
+      `The account view never remounted after selecting ${code}; the browser is at ${this.page.url()}. ` +
+        'Selecting a currency unmounts and re-renders the whole account page, so this means the ' +
+        're-render came back empty three times in a row.',
+    ).toBeVisible({ timeout: 20000 });
   }
 }

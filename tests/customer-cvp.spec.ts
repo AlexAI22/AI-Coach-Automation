@@ -11,6 +11,16 @@ import { hasCredentials } from '../support/credentials';
  * is logged in once per run.
  */
 
+/**
+ * A customer that exists in the account's REAL data, NOT in the Demo Mode
+ * sample set. The search endpoint only ever queries the real customers, which
+ * is why the search tests below turn Demo Mode OFF before typing anything.
+ */
+const SEARCH_CUSTOMER = { query: '2E2', name: '2E2', id: '0009608659' };
+
+/** A query that cannot match any customer, for the negative case. */
+const NO_MATCH_QUERY = 'zzzz-no-such-customer-zzzz';
+
 test.describe('Customer Value Portal (reused session)', () => {
   test.describe.configure({ mode: 'default' });
 
@@ -76,72 +86,95 @@ test.describe('Customer Value Portal (reused session)', () => {
     }
   });
 
-  test('should accept text in the customer search box', async () => {
-    await cvp.ensureCustomersLoaded();
-
-    // The control is present and editable (value reflects typed input).
-    const name = await cvp.firstCustomerName();
-    const token = name.split(/\s+/)[0];
-    await cvp.search(token);
-    await expect(cvp.searchInput).toHaveValue(token);
-
-    await cvp.search('');
-    await expect(cvp.searchInput).toHaveValue('');
-  });
-
-  // Search has been partly wired up since this suite was written: excluding
-  // non-matching customers now works, so it is asserted for real rather than
-  // skipped along with the half that does not (see the next test).
-  test('should filter out non-matching customers via search', async () => {
-    await cvp.ensureCustomersLoaded();
-    const total = await cvp.rows.count();
-    expect(total).toBeGreaterThan(0);
-
-    await cvp.search('zzzz-no-such-customer-zzzz');
-    await expect(cvp.rows).toHaveCount(0);
-
-    // Clearing restores the full list. The filter is debounced and an in-flight
-    // request can briefly land a stale empty result, so rely on the web-first
-    // retry here rather than reading the count once.
-    await cvp.search('');
-    await expect(cvp.rows).toHaveCount(total);
-  });
-
   /**
-   * KNOWN PRODUCT ISSUE — a MATCHING query does not narrow the list.
+   * The only tests that need Demo Mode OFF: search queries the account's real
+   * customers, and the Demo Mode sample set is a separate client-side list the
+   * endpoint knows nothing about.
    *
-   * Measured against the Demo Mode data set (5 customers): searching
-   * "Ballyvesey" leaves all 5 rows visible and the label still reads
-   * "Showing 5 of 5 customers", so unrelated customers (Inflexion Buyout V
-   * Investments LP, Slater & Gordon) stay on screen. Searching by customer ID
-   * behaves the same way. Excluding a non-matching string DOES work, which is
-   * why that half is a separate, passing test above.
-   *
-   * This runs and FAILS on purpose: the assertion states the intended
-   * behaviour, and the failure is the standing signal that search is still
-   * half-implemented. It will pass by itself once filtering is finished — no
-   * edit needed here.
+   * Grouped so Demo Mode can be PUT BACK afterwards. It is shared by the whole
+   * run (one window, one context), every later test needs the sample
+   * customers, and CustomerAccountPage.goto() gets a single shot at recovering
+   * it — so leaving it off here strands the entire account-detail block.
    */
-  test('should narrow the list to matching customers via search', async () => {
-    await cvp.ensureCustomersLoaded();
+  test.describe('search — real customers, Demo Mode OFF', () => {
+    test.afterAll(async ({ sharedPage }) => {
+      if (!hasCredentials()) return;
+      const portal = new CustomerValuePortalPage(sharedPage);
+      await portal.goto();
+      await portal.ensureCustomersLoaded();
+    });
 
-    const fullName = await cvp.firstCustomerName();
-    const token = fullName.split(/\s+/)[0];
+    test('should accept text in the customer search box', async () => {
+      // No customer data needed here — this only checks the control is editable.
+      await cvp.ensureDemoModeOff();
 
-    await cvp.search(token);
-    // The searched-for customer stays listed...
-    await expect(cvp.rows.filter({ hasText: fullName })).toHaveCount(1);
+      await cvp.search(SEARCH_CUSTOMER.query);
+      await expect(cvp.searchInput).toHaveValue(SEARCH_CUSTOMER.query);
 
-    // ...and every row still on screen matches what was typed.
-    const visible = await cvp.rows.count();
-    for (let i = 0; i < visible; i++) {
-      await expect(
-        cvp.nameOf(cvp.rows.nth(i)),
-        `Row ${i + 1} of ${visible} does not match the query "${token}" — the list was not filtered`,
-      ).toContainText(new RegExp(token, 'i'));
-    }
+      await cvp.search('');
+      await expect(cvp.searchInput).toHaveValue('');
+    });
 
-    await cvp.search('');
+    /**
+     * Runs against the account's REAL customers (Demo Mode OFF) — see
+     * SEARCH_CUSTOMER. Typing with Demo Mode ON searches a data set the endpoint
+     * knows nothing about, so the sample rows never react.
+     */
+    test('should filter out non-matching customers via search', async () => {
+      await cvp.ensureDemoModeOff();
+
+      // A matching query puts exactly the one real customer on screen...
+      await cvp.search(SEARCH_CUSTOMER.query);
+      await expect(cvp.rows).toHaveCount(1);
+
+      // ...and a query that matches nothing empties the list FOR REAL. Rows AND
+      // skeletons both have to be gone: the placeholders are the loading state,
+      // so a row count of 0 on its own is equally satisfied by a request that is
+      // merely still in flight, which is how this test used to pass while search
+      // was being pointed at the wrong data set entirely.
+      await cvp.search(NO_MATCH_QUERY);
+      await expect(cvp.showingLabel).toContainText(/Showing 0 of 0/);
+      await expect(cvp.rows).toHaveCount(0);
+      await expect(cvp.skeletonRows).toHaveCount(0);
+
+      // Searching again brings the match back, proving the empty result was the
+      // query doing its job rather than a list that had stopped loading.
+      await cvp.search(SEARCH_CUSTOMER.query);
+      await expect(cvp.rows).toHaveCount(1);
+    });
+
+    /**
+     * WAS A KNOWN PRODUCT ISSUE, AND IS NOT ONE.
+     *
+     * This test spent a long time failing on purpose, with a note saying search
+     * never narrowed the list. Re-measured Aug 2026: search queries the ACCOUNT
+     * REAL CUSTOMERS, while the test was typing into a list showing the Demo
+     * Mode sample set — a separate data set the endpoint knows nothing about, so
+     * the sample rows sat there unchanged and looked like a broken filter.
+     *
+     * With Demo Mode OFF it works exactly as specified:
+     *
+     *   query                          rows  label
+     *   (none)                            0  Showing 0 of 0 customers
+     *   "2E2"                             1  Showing 1 of 1 customers
+     *   "zzzz-no-such-customer-zzzz"      0  Showing 0 of 0 customers
+     *
+     * Note the real list is EMPTY until something is searched for, so there is
+     * no unfiltered baseline to compare against here.
+     */
+    test('should narrow the list to matching customers via search', async () => {
+      await cvp.ensureDemoModeOff();
+
+      await cvp.search(SEARCH_CUSTOMER.query);
+
+      // Exactly the searched-for customer, and nothing besides it.
+      await expect(cvp.rows).toHaveCount(1);
+      await expect(cvp.nameOf(cvp.rows.first())).toHaveText(SEARCH_CUSTOMER.name);
+      await expect(cvp.rows.first()).toContainText('Customer ID: ' + SEARCH_CUSTOMER.id);
+      await expect(cvp.showingLabel).toContainText(/Showing 1 of 1/);
+
+      await cvp.search('');
+    });
   });
 
   test('should change the displayed currency symbol', async () => {
