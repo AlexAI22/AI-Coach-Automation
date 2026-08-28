@@ -9,9 +9,8 @@ import { Page, Locator, expect } from '@playwright/test';
  *     Panel
  *       Title                -> "AI Coach — <opportunity>" + "Close modal" X
  *       SuggestedPrepSteps   -> a "Suggested Questions" disclosure header (a
- *                               button carrying aria-expanded plus a chevron),
- *                               a "Close suggested questions" X, and one
- *                               button per prompt
+ *                               button carrying aria-expanded plus a chevron)
+ *                               and one button per prompt
  *       ContextBanner        -> "Session ready · <customer>"
  *       Body                 -> the conversation area
  *       Footer / QuestionInput -> "Ask a custom question:" input + "Ask" button
@@ -36,12 +35,15 @@ export class CoachMeModalPage {
    * aria-expanded and a chevron, and its only text is the header label.
    */
   readonly suggestedQuestionsDisclosure: Locator;
-  /** The X that collapses the side panel. */
-  readonly closeSuggestedQuestionsButton: Locator;
   /**
-   * Toggle next to the conversation area. Its label flips with the panel
-   * state: "Hide" while the panel is open, "Suggested Questions" once it is
-   * collapsed (both rendered uppercase by CSS).
+   * Toggle next to the conversation area, which collapses and restores the
+   * WHOLE panel. Its label flips with the panel state: "Hide" while open,
+   * "Show" once collapsed (both rendered uppercase by CSS).
+   *
+   * The collapsed label used to be "Suggested Questions"; the app changed it to
+   * "Show" in Aug 2026. A locator matching only the old pair finds nothing once
+   * the panel is collapsed, so expandSuggestedQuestions() could never click
+   * anything and the panel stayed shut.
    */
   readonly suggestedQuestionsToggle: Locator;
 
@@ -157,15 +159,12 @@ export class CoachMeModalPage {
     // Matched case-insensitively: the DOM text is "Suggested Questions", shown
     // uppercase via CSS.
     this.suggestedQuestionsHeader = this.suggestedQuestions.getByText(/^suggested questions$/i);
-    this.closeSuggestedQuestionsButton = this.suggestedQuestions.getByRole('button', {
-      name: 'Close suggested questions',
-    });
     // Restricted to buttons OUTSIDE SuggestedPrepSteps: the panel's own
     // disclosure header also reads "Suggested Questions", so a Panel-wide text
     // match resolves to two elements and fails strict mode on click.
     this.suggestedQuestionsToggle = this.panel
       .locator('button:not([data-sentry-component="SuggestedPrepSteps"] *)')
-      .filter({ hasText: /^\s*(hide|suggested questions)\s*$/i });
+      .filter({ hasText: /^\s*(hide|show)\s*$/i });
 
     this.suggestedQuestionsDisclosure = this.suggestedQuestions.locator('button[aria-expanded]');
     this.prompts = this.suggestedQuestions.locator('button:not([aria-expanded]):not([aria-label])');
@@ -207,21 +206,35 @@ export class CoachMeModalPage {
   }
 
   /**
-   * Collapses the suggested-questions panel via its X.
+   * Collapses the whole suggested-questions panel via the Hide toggle.
    *
-   * The panel collapses to zero width (its children keep a box and so still
-   * count as "visible" to Playwright), which is why callers should assert on
-   * the panel container rather than on the individual prompt buttons.
+   * This used to click a "Close suggested questions" X inside the panel. The
+   * app removed that button in Aug 2026, so the Hide/Show toggle beside the
+   * conversation is the only control left that collapses the panel.
+   *
+   * MEASURED: the panel collapses to ZERO WIDTH but keeps its height, so the
+   * container reports hidden while its children still have a box and still
+   * count as "visible" to Playwright. Assert on the container, never on the
+   * individual prompt buttons.
    */
   async collapseSuggestedQuestions(): Promise<void> {
-    await this.closeSuggestedQuestionsButton.click();
+    await this.suggestedQuestionsToggle.click();
     await expect(this.suggestedQuestions).toBeHidden();
   }
 
-  /** Re-opens the collapsed panel via the "Suggested Questions" toggle. */
+  /** Re-opens the collapsed panel via the same toggle, now reading "Show". */
   async expandSuggestedQuestions(): Promise<void> {
     await this.suggestedQuestionsToggle.click();
     await expect(this.suggestedQuestions).toBeVisible();
+  }
+
+  /**
+   * Collapses just the PROMPT LIST via the panel's disclosure header, leaving
+   * the panel itself on screen: the prompt count drops to 0 and aria-expanded
+   * flips to "false". Reversible by calling it again.
+   */
+  async togglePromptList(): Promise<void> {
+    await this.suggestedQuestionsDisclosure.click();
   }
 
   /**

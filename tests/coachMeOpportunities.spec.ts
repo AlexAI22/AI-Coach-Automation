@@ -72,7 +72,9 @@ test.describe(`Coach Me prompts — ${CUSTOMER.name} / ${OPPORTUNITY}`, () => {
   test('should display the Suggested Questions panel with its header', async () => {
     await expect(coach.suggestedQuestions).toBeVisible();
     await expect(coach.suggestedQuestionsHeader).toBeVisible();
-    await expect(coach.closeSuggestedQuestionsButton).toBeVisible();
+    // The panel's collapse control: a disclosure header carrying aria-expanded.
+    // It replaced the "Close suggested questions" X the app removed in Aug 2026.
+    await expect(coach.suggestedQuestionsDisclosure).toBeVisible();
   });
 
   test(`should display exactly ${EXPECTED_PROMPTS.length} suggested question prompts`, async () => {
