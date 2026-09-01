@@ -3,13 +3,29 @@
 # Given/When/Then form; the Playwright spec is the executable implementation.
 #
 # Preconditions shared by every scenario:
-#  - The session is authenticated ONCE (global-setup.ts) and reused via
-#    storageState, so no scenario logs in or out.
+#  - The session is authenticated ONCE per run and reused
+#    (tests/support/fixtures.ts + support/session.ts), so no scenario logs in
+#    or out. There is no global-setup any more: the login happens in the single
+#    browser window the whole run shares.
 #  - The base URL is the staging tenant (https://stage-aicoach.insight.com).
 #  - The first-run "Welcome to AI Coach" personalisation modal is dismissed
 #    before any interaction, as it overlays the page and intercepts clicks.
 #  - A fresh account has no real customers, so scenarios that need rows enable
 #    Demo Mode, which injects the sample customer data set.
+#  - THE SEARCH SCENARIOS ARE THE EXCEPTION: they turn Demo Mode OFF. Search
+#    queries the account's REAL customers, and the Demo Mode sample set is a
+#    separate client-side list the endpoint knows nothing about, so a query
+#    typed with Demo Mode on appears to do nothing at all. They run as a group
+#    and switch Demo Mode back on afterwards, because it is shared by the run's
+#    single window and every later scenario needs the sample customers.
+#  - A ROW COUNT OF ZERO IS AMBIGUOUS. While a list or search request is in
+#    flight the rows are replaced by SkeletonRow placeholders, a DIFFERENT
+#    component, so "no rows" also means "still loading". Scenarios asserting an
+#    empty result check the skeletons and the "Showing 0 of 0" label as well.
+#  - Typing before the portal has hydrated is silently lost: the search box is a
+#    controlled input, and a value set too early is wiped by the re-render and
+#    never reaches the backend. The automation waits for the "Showing X of Y"
+#    label, which renders only once the list endpoint has answered.
 
 Feature: Customer Value Portal
   As an authenticated AI Coach user
@@ -50,39 +66,53 @@ Feature: Customer Value Portal
 
   Scenario: Accept text in the customer search box
     Given I dismiss the "Welcome to AI Coach" modal if it is shown
-    And Demo Mode is enabled so sample customers are loaded
-    When I type a customer's name into the search box
-    Then the search box value should equal what I typed
+    And Demo Mode is turned off so the real customer list is shown
+    When I type "2E2" into the search box
+    Then the search box value should read "2E2"
     When I clear the search box
     Then the search box value should be empty
 
   Scenario: Filter out non-matching customers via search
-    # This half of search IS wired up now, so it runs and passes. The filter is
-    # debounced and an in-flight request can briefly land a stale empty result,
-    # so the automation retries rather than reading the row count once.
+    # This scenario used to pass for the WRONG REASON. It waited for a row count
+    # of zero, which is also what the refetch skeleton produces, so it would have
+    # passed just as happily for a query that MATCHES a customer. It now proves
+    # the list is genuinely empty - no rows, no skeletons, "Showing 0 of 0" - and
+    # searches again afterwards so the empty result is shown to be the query
+    # doing its job rather than a list that had stopped loading.
     Given I dismiss the "Welcome to AI Coach" modal if it is shown
-    And Demo Mode is enabled so sample customers are loaded
+    And Demo Mode is turned off so the real customer list is shown
+    When I search for "2E2"
+    Then exactly one customer row should be shown
     When I search for a name that does not exist
-    Then no customer rows should be shown
-    When I clear the search box
-    Then the full customer list should be restored
+    Then the label should read "Showing 0 of 0 customers"
+    And no customer rows should be shown
+    And no loading skeletons should be left on screen
+    When I search for "2E2" again
+    Then exactly one customer row should be shown
 
-  @known-issue
   Scenario: Narrow the list to matching customers via search
-    # KNOWN PRODUCT ISSUE - this scenario RUNS and FAILS on purpose.
-    # Measured against the Demo Mode set (5 customers): searching "Ballyvesey"
-    # leaves all 5 rows visible and the label still reads "Showing 5 of 5
-    # customers", so unrelated customers stay on screen. Searching by customer
-    # ID behaves the same. Excluding a non-matching string DOES work, which is
-    # why that half is the separate passing scenario above.
-    # The assertion states the INTENDED behaviour, so the failure is the
-    # standing signal that search is half-implemented; it passes by itself once
-    # filtering is finished, with no edit needed.
+    # WAS A KNOWN PRODUCT ISSUE, AND IS NOT ONE. This scenario spent a long time
+    # failing on purpose, with a note saying search never narrowed the list.
+    # Re-measured Aug 2026: search queries the account's REAL customers, while
+    # the scenario was typing into a list showing the Demo Mode sample set - a
+    # separate data set the endpoint knows nothing about - so the sample rows sat
+    # there unchanged and looked like a broken filter. It was the wrong data
+    # source, not a broken feature. With Demo Mode OFF it works as specified:
+    #
+    #   query                          rows  label
+    #   (none)                            0  Showing 0 of 0 customers
+    #   "2E2"                             1  Showing 1 of 1 customers
+    #   "zzzz-no-such-customer-zzzz"      0  Showing 0 of 0 customers
+    #
+    # Note the real list is EMPTY until something is searched for, so there is no
+    # unfiltered baseline to compare against.
     Given I dismiss the "Welcome to AI Coach" modal if it is shown
-    And Demo Mode is enabled so sample customers are loaded
-    When I search for an existing customer's name
-    Then the searched-for customer should remain visible
-    And every row still on screen should match the query
+    And Demo Mode is turned off so the real customer list is shown
+    When I search for "2E2"
+    Then exactly one customer row should be shown
+    And the customer name should read "2E2"
+    And the row should show "Customer ID: 0009608659"
+    And the label should read "Showing 1 of 1 customers"
 
   Scenario: Change the displayed currency symbol
     Given I dismiss the "Welcome to AI Coach" modal if it is shown
@@ -109,6 +139,16 @@ Feature: Customer Value Portal
   #    hard-coded, because the customer set can change.
   #  - The customer table loads asynchronously, so the automated suite uses a
   #    raised (20s) web-first assertion timeout.
+  #  - CHANGING THE CURRENCY REFETCHES THE LIST: the rows are swapped for
+  #    skeletons for one to three seconds and then re-render carrying the new
+  #    symbol, so the automation waits for the list to come back before
+  #    asserting and recovers if the refetch returns nothing.
+  #  - The search box and the pagination block are located through the app's
+  #    component hooks, both renamed in Aug 2026 ("Search" to "SearchBar",
+  #    "PaginationButtons" to "Pagination"). A rename does not announce itself -
+  #    the locator simply matches nothing and the step waits out the full test
+  #    timeout - so both are now matched by PREFIX.
+  #  - An "Account Team" filter sits beside the search box. It is NOT covered.
 
 
 # Account detail page, reached from the customer list
@@ -251,7 +291,11 @@ Feature: Customer Value Portal - Account detail
     Given I open the account page for "<customer>"
     When I open the "Microsoft Deep Dive" tab
     Then the tenant selector should be visible
-    And the sections "Estate footprint", "Top insights", "End-user products", "Azure services consumption", "On-prem & hybrid" and "Eligible funded workshops" should be visible
+    # "Top insights" is deliberately absent: it rendered earlier the same day and
+    # then stopped, and a 25s recon found 0 occurrences anywhere on the tab while
+    # the other five were stable. It is either removed or now conditional on the
+    # customer having insights. WORTH CONFIRMING with the product team.
+    And the sections "Estate footprint", "End-user products", "Azure services consumption", "On-prem & hybrid" and "Eligible funded workshops" should be visible
 
     Examples:
       | customer                          |
@@ -275,6 +319,11 @@ Feature: Customer Value Portal - Account detail
   #    buttons), not the AI-generated body text, which varies per customer/run.
   #  - Expansion Plan and Microsoft Deep Dive load asynchronously, so the
   #    automated suite waits with raised timeouts.
+  #  - SELECTING AN ACCOUNT CURRENCY UNMOUNTS THE WHOLE ACCOUNT VIEW for one to
+  #    three seconds - no AccountTitle, no KPI cards, an empty main - and it then
+  #    remounts with the new currency applied. The automation waits out that
+  #    remount and reopens the page if it comes back empty, so the step cannot
+  #    fail against an element that is merely mid-remount.
   #  - Account Roadmap sections expand to different sizes depending on content
   #    (a populated section is tall, an empty "No data available" one is short),
   #    so "expand" is asserted as growth beyond the collapsed height, not a

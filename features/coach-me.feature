@@ -88,9 +88,10 @@
 #  5. The modal has no role="dialog", so the automation locates it through the
 #     app's data-sentry-component hooks instead of ARIA roles.
 #
-#  6. The Suggested Questions panel collapses to zero width rather than
-#     unmounting, and its children keep a layout box, so "hidden" is asserted on
-#     the panel container, not on the individual prompt buttons.
+#  6. The Suggested Questions panel collapses to ZERO WIDTH rather than
+#     unmounting - it keeps its height, and its children keep a layout box - so
+#     "hidden" is asserted on the panel container, not on the individual prompt
+#     buttons.
 #
 #  7. THE PANEL HEADER ROW IS ITSELF A BUTTON. "Suggested Questions" is rendered
 #     as a disclosure control (aria-expanded + a chevron), not as a plain label,
@@ -99,6 +100,27 @@
 #     locator that only excluded aria-labelled buttons let the header in and the
 #     prompt assertions received "Suggested Questions" as an extra first entry.
 #     CoachMeModalPage.prompts therefore excludes aria-expanded as well.
+#
+#  8. THE PANEL'S "Close suggested questions" X WAS REMOVED in Aug 2026, from
+#     the Opportunities and Account Roadmap modals alike, and TWO controls now
+#     cover collapsing. They are NOT interchangeable:
+#
+#       Control            Where                     Effect
+#       Disclosure header  inside SuggestedPrepSteps  collapses the PROMPT LIST
+#                                                     (8 prompts to 0); the
+#                                                     panel stays on screen
+#       "Hide" / "Show"    beside the conversation    collapses the WHOLE panel
+#                                                     to zero width
+#
+#     Removing the X failed the roadmap suite on the assertion that it is
+#     visible, and because that suite runs SERIAL the remaining 14 cases never
+#     ran at all - the reported failure count understated the damage.
+#
+#     A SECOND break was hiding behind the first: the Hide toggle's collapsed
+#     label changed from "Suggested Questions" to "Show", so a locator matching
+#     only the old pair found nothing once the panel was collapsed, and the
+#     restore step could never click anything. It would have failed immediately
+#     after the case that was reported.
 # ============================================================================
 
 
@@ -127,7 +149,7 @@ Feature: Coach Me - Opportunities suggested question prompts
   Scenario: Display the Suggested Questions panel with its header
     Then the "Suggested Questions" panel should be visible
     And it should show the "Suggested Questions" header
-    And it should offer a control to close the panel
+    And the header should be a disclosure control that collapses the prompt list
 
   Scenario: Display exactly eight suggested question prompts
     Then exactly 8 suggested question prompts should be displayed
@@ -168,9 +190,9 @@ Feature: Coach Me - Opportunities suggested question prompts
     And the "Ask" button should be disabled while the input is empty
 
   Scenario: Hide the prompts when the panel is collapsed and restore them when reopened
-    When I close the Suggested Questions panel
+    When I collapse the whole panel via the "Hide" toggle
     Then the Suggested Questions panel should no longer be shown
-    When I reopen it via the "Suggested Questions" toggle
+    When I restore it via the same toggle, which now reads "Show"
     Then all 8 prompts should be displayed again, verbatim and in order
 
   Scenario: Display the same prompts after the modal is closed and reopened
@@ -212,6 +234,9 @@ Feature: Coach Me - Opportunities answers
     And exactly one assistant answer should be returned
     And the answer should be longer than 200 characters
     And the answer should not contain a failure marker
+    When I wait 3 seconds
+    And I press "Clear chat"
+    Then the conversation should be empty again
     And no HTTP 4xx or 5xx errors should have occurred during the run
 
     Examples:
@@ -229,8 +254,13 @@ Feature: Coach Me - Opportunities answers
   #  - Answers are non-deterministic prose, so only properties that must hold
   #    for ANY valid answer are asserted. The answer text is attached to the run
   #    for human review, and grounding signals are logged, not asserted.
-  #  - This suite does NOT clear the chat after each answer (unlike the two
-  #    below); it clears BEFORE each question instead.
+  #  - The chat is cleared BEFORE each question (conversations persist, so a run
+  #    that died mid-question would otherwise leave the opportunity dirty) AND
+  #    AFTER each answer, matching the Expansion Plan and Account Roadmap answer
+  #    suites. If an assertion fails the trailing clear is skipped, which is
+  #    harmless: the next case clears before it asks.
+  #  - "Clear chat" is an anchor carrying role="button" in the coach toolbar
+  #    rather than a <button>, so it is located by ROLE, not by tag.
   #  - Observed behaviour against the NEW 8-prompt set (7 passed, 1 failed):
   #      1 client outcomes         ~19s   ~3.6k chars  names the customer
   #      2 why recommended         ~22s   ~5.3k chars  names the customer
@@ -425,7 +455,7 @@ Feature: Coach Me - Account Roadmap suggested question prompts
   Scenario: Display the Suggested Questions panel with its header
     Then the "Suggested Questions" panel should be visible
     And it should show the "Suggested Questions" header
-    And it should offer a control to close the panel
+    And the header should be a disclosure control that collapses the prompt list
 
   Scenario: Display exactly eight suggested question prompts
     Then exactly 8 suggested question prompts should be displayed
@@ -466,9 +496,9 @@ Feature: Coach Me - Account Roadmap suggested question prompts
     And the "Ask" button should be disabled while the input is empty
 
   Scenario: Hide the prompts when the panel is collapsed and restore them when reopened
-    When I close the Suggested Questions panel
+    When I collapse the whole panel via the "Hide" toggle
     Then the Suggested Questions panel should no longer be shown
-    When I reopen it via the "Suggested Questions" toggle
+    When I restore it via the same toggle, which now reads "Show"
     Then all 8 prompts should be displayed again, verbatim and in order
 
   Scenario: Display the same prompts after the modal is closed and reopened

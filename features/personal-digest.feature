@@ -3,8 +3,10 @@
 # Given/When/Then form; the Playwright spec is the executable implementation.
 #
 # Preconditions shared by every scenario:
-#  - The session is authenticated ONCE (global-setup.ts) and reused via
-#    storageState, so no scenario logs in or out.
+#  - The session is authenticated ONCE per run and reused
+#    (tests/support/fixtures.ts + support/session.ts), so no scenario logs in
+#    or out. There is no global-setup any more: the login happens in the single
+#    browser window the whole run shares.
 #  - The base URL is the staging tenant (https://stage-aicoach.insight.com).
 #  - The first-run "Welcome to AI Coach" personalisation modal is dismissed
 #    before any interaction, as it overlays the page and intercepts clicks.

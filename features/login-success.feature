@@ -4,6 +4,10 @@
 #
 # These are logged-out tests against the PropelAuth login screen
 # (staging tenant AICOACH-STAGING) and need no credentials.
+#
+# They take the "anonPage" fixture rather than the shared authenticated page:
+# a SECOND window in the same browser, created only when these scenarios run,
+# with cookies cleared between them (tests/support/fixtures.ts).
 
 Feature: Login
   As a visitor of the AI Coach app
@@ -41,6 +45,7 @@ Feature: Login
     When I click the "Sign up" link
     Then the URL matches "/signup"
 
-  # Successful, credentialed login is covered separately (global-setup.ts and
-  # sales-coach.spec.ts) with tracing disabled so real credentials are never
-  # captured in a trace artifact.
+  # Successful, credentialed login is covered separately: support/session.ts
+  # logs in once per run, in the shared window, and sales-coach.spec.ts asserts
+  # the app is reached without re-logging in. Tracing is off by default so real
+  # credentials are never captured in a trace artifact.
