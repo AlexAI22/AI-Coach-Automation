@@ -83,10 +83,21 @@ export default defineConfig({
   workers: 1,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  /* Retry on CI only. Overridable with RETRIES because a failing AI-answer
+     test costs two to five MINUTES per attempt, so 2 retries triples the most
+     expensive tests in the suite; the nightly job lowers it to 1. */
+  retries: Number(process.env.RETRIES ?? (isCI ? '2' : '0')),
+  /* Reporters.
+     On CI, failures must be printed AS THEY HAPPEN. The html reporter only
+     writes at the END of a run, so when a job is killed - by the job timeout,
+     or by the concurrency group cancelling a superseded run - the log holds
+     nothing but progress dots and no report artifact is produced. That is
+     exactly how a 90-minute overrun became a run with zero diagnosable output.
+     'list' streams each failure inline so even a cancelled run says what broke,
+     and 'github' annotates the failing lines in the run/PR UI. */
+  reporter: isCI
+    ? [['github'], ['list'], ['html', { open: 'never' }]]
+    : [['html']],
   /* The staging backend renders content asynchronously and slowly, so give
      web-first assertions more room than the 5s default. */
   expect: { timeout: 20000 },

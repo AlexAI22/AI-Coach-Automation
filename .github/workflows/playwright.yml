@@ -6,13 +6,21 @@ name: Playwright Tests
 #   AICOACH_PASSWORD  - staging account password
 #
 # Test selection:
-#   push / pull_request        -> "smoke" (fast, non-mutating tests only)
-#   nightly schedule           -> "smoke" (see the cron note below)
-#   manual (workflow_dispatch) -> choose "smoke", "full" or "coach-me"
+#   push / pull_request        -> "smoke"   (fast, NO AI runs - see below)
+#   nightly schedule           -> "nightly" (smoke + the AI answer suites)
+#   manual (workflow_dispatch) -> smoke | answers | nightly | full | coach-me
 #
-# "full" runs the agent chat-creation tests too - these create real chats and
-# trigger ~2-minute AI runs on the shared staging account, so they are
-# intentionally kept out of the per-push run.
+# WHY SMOKE NO LONGER INCLUDES THE ANSWER SUITES. "Smoke" used to mean
+# everything except the chat-creation tests, which still left the three Coach Me
+# ANSWER specs in: 21 test cases driving 36 real AI runs at 15-70s each. With
+# retries: 2 a failing answer test costs up to 15 minutes on its own, and a run
+# with 15 failures burned 45 attempts and was killed by the 90-minute job
+# timeout - producing no failure summary and no report artifact, because both
+# are written only at the end of a run. Per-push CI is now fast and always
+# reports; the AI load moved to the nightly.
+#
+# "full" also runs the agent chat-creation tests - these create real chats on the
+# shared staging account, so they stay out of every automatic run.
 
 on:
   push:
@@ -36,7 +44,7 @@ on:
       suite:
         description: Which tests to run
         type: choice
-        options: [smoke, full, coach-me]
+        options: [smoke, answers, nightly, full, coach-me]
         default: smoke
 
 # One run per ref; cancel superseded runs.
@@ -48,9 +56,10 @@ jobs:
   test:
     name: E2E (${{ github.event.inputs.suite || 'smoke' }})
     runs-on: ubuntu-latest
-    # The Coach Me answer suites alone are ~36 real AI runs (~20 min), and CI
-    # sets retries: 2, so a handful of failures triples their cost. 45 min was
-    # not enough headroom for a nightly that must finish.
+    # Smoke finishes in ~10 minutes. The cap is sized for the nightly, which
+    # adds ~36 real AI runs; it also lowers RETRIES to 1 and passes
+    # --max-failures so a bad night FAILS FAST WITH A REPORT rather than being
+    # killed at the cap with nothing to read.
     timeout-minutes: 90
     env:
       # Map repository secrets to the env vars the suite reads.
@@ -97,25 +106,51 @@ jobs:
           echo "Credentials present for ${EMAIL%%@*}@..."
 
       - name: Run tests
+        env:
+          # A failing AI-answer test costs 2-5 minutes PER ATTEMPT, so the
+          # nightly halves the retry budget the fast suites keep.
+          RETRIES: ${{ (github.event_name == 'schedule' || github.event.inputs.suite == 'nightly' || github.event.inputs.suite == 'answers') && '1' || '2' }}
         run: |
-          case "${{ github.event.inputs.suite }}" in
+          # Every AI-answer case is titled "...should return a usable answer",
+          # and every chat-creation case "should create a ...", so both groups
+          # are selectable by title without a tagging scheme.
+          AI_ANSWERS="should return a usable answer"
+          MUTATING="should create a"
+
+          SUITE="${{ github.event.inputs.suite }}"
+          if [ -z "$SUITE" ]; then
+            if [ "${{ github.event_name }}" = "schedule" ]; then SUITE=nightly; else SUITE=smoke; fi
+          fi
+          echo "Selected suite: $SUITE"
+
+          case "$SUITE" in
             full)
-              echo "Running FULL suite (includes mutating chat-creation tests)"
+              echo "FULL - everything, including the mutating chat-creation tests"
               npx playwright test
               ;;
             coach-me)
-              echo "Running COACH ME suites only"
+              echo "COACH ME - all six Coach Me specs"
               npm run test:coach-me:everything
               ;;
+            answers)
+              echo "ANSWERS - the AI answer suites only (~36 real AI runs)"
+              npx playwright test --grep "$AI_ANSWERS" --max-failures=10
+              ;;
+            nightly)
+              echo "NIGHTLY - everything non-mutating, AI answer suites included"
+              npx playwright test --grep-invert "$MUTATING" --max-failures=20
+              ;;
             *)
-              # Also the path taken by push, pull_request and the nightly cron.
-              echo "Running SMOKE suite (excluding mutating chat-creation tests)"
-              npx playwright test --grep-invert "should create a"
+              echo "SMOKE - no AI runs, no mutating tests"
+              npx playwright test --grep-invert "$MUTATING|$AI_ANSWERS"
               ;;
           esac
 
+      # always(), NOT !cancelled(): a job killed by the timeout is CANCELLED, so
+      # !cancelled() skipped this step in exactly the run where the report was
+      # most needed.
       - name: Upload HTML report
-        if: ${{ !cancelled() }}
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ github.run_id }}

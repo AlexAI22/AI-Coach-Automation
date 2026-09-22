@@ -21,6 +21,18 @@ const SEARCH_CUSTOMER = { query: '2E2', name: '2E2', id: '0009608659' };
 /** A query that cannot match any customer, for the negative case. */
 const NO_MATCH_QUERY = 'zzzz-no-such-customer-zzzz';
 
+/**
+ * These three tests are the ONLY ones in the suite that depend on the
+ * logged-in account's REAL customer data rather than the Demo Mode sample
+ * set, which makes them the likeliest to fail on CI while passing locally.
+ * Say so in the failure rather than leaving a bare "expected 1, received 0".
+ */
+const SEARCH_DATA_HINT =
+  `Expected exactly one row for query "${SEARCH_CUSTOMER.query}". Search runs against the ` +
+  `REAL customers the logged-in account can see, so a count of 0 most likely means this ` +
+  `account cannot see customer ${SEARCH_CUSTOMER.name} (${SEARCH_CUSTOMER.id}) - on CI, ` +
+  `check that the AICOACH_EMAIL secret is the same staging account used locally.`;
+
 test.describe('Customer Value Portal (reused session)', () => {
   test.describe.configure({ mode: 'default' });
 
@@ -125,7 +137,7 @@ test.describe('Customer Value Portal (reused session)', () => {
 
       // A matching query puts exactly the one real customer on screen...
       await cvp.search(SEARCH_CUSTOMER.query);
-      await expect(cvp.rows).toHaveCount(1);
+      await expect(cvp.rows, SEARCH_DATA_HINT).toHaveCount(1);
 
       // ...and a query that matches nothing empties the list FOR REAL. Rows AND
       // skeletons both have to be gone: the placeholders are the loading state,
@@ -140,7 +152,7 @@ test.describe('Customer Value Portal (reused session)', () => {
       // Searching again brings the match back, proving the empty result was the
       // query doing its job rather than a list that had stopped loading.
       await cvp.search(SEARCH_CUSTOMER.query);
-      await expect(cvp.rows).toHaveCount(1);
+      await expect(cvp.rows, SEARCH_DATA_HINT).toHaveCount(1);
     });
 
     /**
@@ -168,7 +180,7 @@ test.describe('Customer Value Portal (reused session)', () => {
       await cvp.search(SEARCH_CUSTOMER.query);
 
       // Exactly the searched-for customer, and nothing besides it.
-      await expect(cvp.rows).toHaveCount(1);
+      await expect(cvp.rows, SEARCH_DATA_HINT).toHaveCount(1);
       await expect(cvp.nameOf(cvp.rows.first())).toHaveText(SEARCH_CUSTOMER.name);
       await expect(cvp.rows.first()).toContainText('Customer ID: ' + SEARCH_CUSTOMER.id);
       await expect(cvp.showingLabel).toContainText(/Showing 1 of 1/);
