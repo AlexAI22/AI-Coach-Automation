@@ -63,9 +63,9 @@ async function authenticate(page: Page): Promise<void> {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   const loginPage = new LoginPage(page);
-  // The authenticated app shell; PropelAuth's login page is a separate app and
-  // carries no data-sentry-component hooks, so this cannot match there.
-  const appShell = page.locator('[data-sentry-component="Header"]');
+  // The authenticated shell exposes a stable banner landmark. PropelAuth's
+  // login page does not, so this cannot match the login form.
+  const appShell = page.getByRole('banner');
 
   // Staging redirects to PropelAuth when the session is missing or expired, but
   // that redirect is CLIENT-SIDE and happens after domcontentloaded. Reading

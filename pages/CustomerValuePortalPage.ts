@@ -10,8 +10,9 @@ import { CUSTOMER_ACCOUNT_PATH, CUSTOMER_VALUE_PORTAL_PATH } from '../support/ro
  * L12M Invoiced Total / Account Team columns) and pagination controls with a
  * "Showing X of Y customers" label.
  *
- * Locators lean on the app's stable `data-sentry-component` hooks, matching the
- * rest of the page objects in this suite.
+ * The app no longer emits `data-sentry-component` hooks, so locators are
+ * anchored on accessible roles, text and grid structure, matching the rest of
+ * the page objects in this suite.
  */
 export class CustomerValuePortalPage {
   readonly page: Page;
@@ -47,7 +48,9 @@ export class CustomerValuePortalPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.root = page.locator('[data-sentry-component="CustomerValuePortal"]');
+    const main = page.locator('main');
+
+    this.root = main;
     this.heading = page.getByRole('heading', { name: 'Microsoft Customer Insights', level: 1 });
     // The subtitle is rendered twice (responsive layouts); scope to the first.
     // Matched by pattern because the qualifier has already changed once
@@ -55,31 +58,35 @@ export class CustomerValuePortalPage {
     // relationships"); the surrounding sentence is the stable part.
     this.description = page.getByText(/Manage and track your .*customer relationships/i).first();
     this.demoModeButton = page.getByRole('button', { name: 'Demo Mode' });
-    this.currencySelect = page.locator('[data-sentry-component="CurrencySelect"] select');
-    // Located via the search component rather than its placeholder: the copy has
-    // already changed once ("Search customers by name..." -> "Search by
-    // customer's sold-to, RP, GP, or GGP name or ID number") and contains a
-    // curly apostrophe, so matching on it is needlessly brittle.
-    //
-    // RENAMED (Aug 2026): the component is "SearchBar", it was "Search". Matched
-    // by PREFIX so both spellings resolve — the rename does not 404 or otherwise
-    // announce itself, it just makes the box unfindable and every search test
-    // hang on fill() until the test timeout.
-    this.searchInput = page.locator('[data-sentry-component^="Search"] input');
+    this.currencySelect = main.getByRole('combobox', { name: 'Display currency' });
+    // Matched on the leading words only: the full placeholder carries a curly
+    // apostrophe ("customer’s") and has already been reworded once.
+    this.searchInput = main.getByRole('textbox', { name: /Search by customer/i });
 
-    this.tableHeader = page.locator('[data-sentry-component="TableHeader"]');
-    this.rows = page.locator('[data-sentry-component="TableBody"]');
+    // The list is a CSS grid, not a <table>: the header row is the innermost
+    // element carrying every column label, and the rows are its siblings.
+    this.tableHeader = main
+      .locator('div')
+      .filter({ has: page.getByText('MS L12M Licensing Revenue', { exact: true }) })
+      .filter({ has: page.getByText('Account Team', { exact: true }) })
+      .last();
+    const table = this.tableHeader.locator('xpath=..');
+    // Only real rows are clickable, which is what separates them from the
+    // loading placeholders below.
+    this.rows = table.locator(':scope > div.cursor-pointer');
     // Loading placeholders. They occupy the table while a list/search request
     // is in flight, and they are ALSO the empty state when the account has no
     // customers — so "rows === 0" alone never distinguishes "still loading"
     // from "nothing matched". Assert on this too when that difference matters.
-    this.skeletonRows = page.locator('[data-sentry-component="SkeletonRow"]');
+    this.skeletonRows = table.locator(':scope > div:not(:first-child):not(.cursor-pointer)');
 
-    // RENAMED (Aug 2026): "Pagination", was "PaginationButtons". Prefix-matched
-    // for the same reason as the search box above; it still holds the
-    // "Showing X of Y customers" label and the four page buttons.
-    this.pagination = page.locator('[data-sentry-component^="Pagination"]');
-    this.showingLabel = this.pagination.getByText(/Showing\s+\d+\s+of\s+\d+/);
+    this.pagination = main
+      .locator('div')
+      .filter({ has: page.getByRole('button', { name: 'First page' }) })
+      .filter({ has: page.getByRole('button', { name: 'Last page' }) })
+      .last();
+    // The label sits outside the button group, so it is matched page-wide.
+    this.showingLabel = main.getByText(/Showing\s+\d+\s+of\s+\d+/);
     this.firstPageButton = this.pagination.getByRole('button', { name: 'First page' });
     this.prevPageButton = this.pagination.getByRole('button', { name: 'Previous page' });
     this.nextPageButton = this.pagination.getByRole('button', { name: 'Next page' });
@@ -211,7 +218,7 @@ export class CustomerValuePortalPage {
 
   /** The customer-name element within a given row. */
   nameOf(row: Locator): Locator {
-    return row.locator('[data-sentry-component="Customer"] p').first();
+    return row.locator('p').first();
   }
 
   /**
@@ -227,14 +234,14 @@ export class CustomerValuePortalPage {
   }
 
   /**
-   * The first monetary cell within a given row. The table now renders three
-   * currency columns per row (MS L12M Licensing Revenue, MS L12M ACR,
-   * L12M Invoiced Total), each a `CurrencyColumn` component; the first is the
-   * MS L12M Licensing Revenue value. Used to assert currency formatting and
-   * that the displayed symbol tracks the currency selector.
+   * The first monetary cell within a given row. Each row is a six-column grid
+   * (Customer, Channel, MS L12M Licensing Revenue, MS L12M ACR,
+   * L12M Invoiced Total, Account Team), so the third cell is the MS L12M
+   * Licensing Revenue value. The money cells are spans rather than divs, so
+   * the columns are counted across every child tag.
    */
   revenueCellOf(row: Locator): Locator {
-    return row.locator('[data-sentry-component="CurrencyColumn"]').first();
+    return row.locator(':scope > *').nth(2);
   }
 
   /** Trimmed name text of the first customer row (waits for it to render). */

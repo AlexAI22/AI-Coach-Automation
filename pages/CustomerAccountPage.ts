@@ -90,42 +90,87 @@ export class CustomerAccountPage {
     EUR: '€',
   };
 
+  /**
+   * The app stopped emitting `data-sentry-component` hooks, so every locator
+   * below is anchored on accessible roles/text or on structure. Inner `has:`
+   * locators must be page-rooted — they resolve relative to the outer match.
+   */
   constructor(page: Page) {
     this.page = page;
-    this.root = page.locator('[data-sentry-component="AccountPage"]');
-    this.accountTitle = page.locator('[data-sentry-component="AccountTitle"]');
+    const main = page.locator('main');
+
+    this.root = main;
+    // Pairing the breadcrumb with the title keeps this off the portal LIST,
+    // which has no "Customers" link — goto()'s bounce check depends on that.
+    this.accountTitle = main
+      .locator('div')
+      .filter({ has: page.getByRole('link', { name: 'Customers' }) })
+      .filter({ has: page.getByRole('heading', { level: 1 }) })
+      .last();
     this.customersLink = this.accountTitle.getByRole('link', { name: 'Customers' });
-    this.heading = this.accountTitle.getByRole('heading', { level: 1 });
+    this.heading = this.accountTitle.getByRole('heading', { level: 1 }).first();
     // The id label is "Customer ID:" or "GGP ID:" depending on how the page
     // was reached, so match either.
-    this.customerId = this.accountTitle.getByText(/ID:\s*\d+/);
-    this.currencySelect = page.locator('[data-sentry-component="CurrencySelect"] select');
+    this.customerId = this.accountTitle.getByText(/ID:\s*\d+/).first();
+    this.currencySelect = main.getByRole('combobox', { name: 'Display currency' });
 
-    this.kpiCards = page.locator('[data-sentry-component="KpiCard"]');
+    this.kpiCards = main
+      .locator('p')
+      .filter({ hasText: new RegExp(`^(${CustomerAccountPage.KPI_TITLES.join('|')})$`) });
 
-    this.salesChannelSection = page.locator('[data-sentry-component="SalesChannelOverview"]');
-    this.salesChannelToggle = this.salesChannelSection.getByRole('button', { name: 'Sales Channel Overview' });
+    this.salesChannelToggle = main.getByRole('button', { name: 'Sales Channel Overview' });
+    this.salesChannelSection = main
+      .locator('div')
+      .filter({ has: page.getByRole('button', { name: 'Sales Channel Overview' }) })
+      .filter({ has: page.locator('table') })
+      .last();
     this.salesChannelTable = this.salesChannelSection.locator('table');
 
-    this.teamCards = page.locator('[data-sentry-component="TeamCard"]');
-    this.accountTeamCard = this.teamCards.filter({ hasText: 'Insight Account Team' });
-    this.keyContactsCard = this.teamCards.filter({ hasText: 'Key Customer Contacts' });
+    this.accountTeamCard = main
+      .locator('div')
+      .filter({ has: page.getByRole('heading', { name: 'Insight Account Team', exact: true }) })
+      .filter({ hasText: /Account Owner|Customer Success Manager/ })
+      .last();
+    this.keyContactsCard = main
+      .locator('div')
+      .filter({ has: page.getByRole('heading', { name: 'Key Customer Contacts', exact: true }) })
+      .last();
+    this.teamCards = this.accountTeamCard.or(this.keyContactsCard);
 
-    this.tabs = page.locator('[data-sentry-component="Tabs"]');
-    // The app currently renders the list as "OpportunitiesLegacy"; match the
-    // prefix so both that and a future "Opportunities" component are found
-    // (same approach as expansionPlanArea below). Only one renders at a time.
-    this.opportunities = page.locator('[data-sentry-component^="Opportunities"]');
-    // Each opportunity is a direct child card of the Opportunities container.
+    this.tabs = main
+      .locator('div')
+      .filter({ has: page.getByRole('button', { name: 'Microsoft Deep Dive', exact: true }) })
+      .filter({ has: page.getByRole('button', { name: 'Upload Materials', exact: true }) })
+      .last();
+
+    // Only one tab panel renders at a time, so the opportunity and expansion
+    // lists are both the panel's first child.
+    this.opportunities = this.tabPanel.locator(':scope > div').first();
     this.opportunityCards = this.opportunities.locator(':scope > div');
     this.coachMeButtons = this.opportunities.getByRole('button', { name: 'Coach Me' });
 
-    this.expansionPlanList = page.locator('[data-sentry-component="ExpansionPlanList"]');
-    // Loading (skeleton) or loaded list — either proves the panel switched.
-    this.expansionPlanArea = page.locator('[data-sentry-component^="ExpansionPlan"]');
-    this.accountRoadmap = page.locator('[data-sentry-component="AccountRoadmap"]');
-    this.roadmapSections = this.accountRoadmap.locator('[data-sentry-component="AccordionSection"]');
-    this.deepDiveTenant = page.locator('[data-sentry-component="TenantDropdown"]');
+    this.expansionPlanList = this.tabPanel.locator(':scope > div').first();
+    this.expansionPlanArea = this.expansionPlanList;
+
+    this.accountRoadmap = main
+      .locator('div')
+      .filter({ has: page.getByRole('heading', { level: 1, name: 'Account Roadmap', exact: true }) })
+      .filter({ has: page.getByRole('button', { name: 'Coach Me' }) })
+      .last();
+    const sections = CustomerAccountPage.ROADMAP_SECTIONS;
+    this.roadmapSections = this.accountRoadmap
+      .locator('div')
+      .filter({ has: page.getByRole('button', { name: sections[0], exact: true }) })
+      .filter({ has: page.getByRole('button', { name: sections[sections.length - 1], exact: true }) })
+      .last()
+      .locator(':scope > div');
+
+    this.deepDiveTenant = this.tabPanel.getByText(/All tenants/).first();
+  }
+
+  /** The active tab's content, which renders as the tab strip's next sibling. */
+  private get tabPanel(): Locator {
+    return this.tabs.locator('xpath=following-sibling::div[1]');
   }
 
   /** An Account Roadmap accordion section located by its title. */
@@ -265,12 +310,12 @@ export class CustomerAccountPage {
   }
 
   /**
-   * The expansion plan cards. ExpansionPlanList renders an intro paragraph plus
-   * a single wrapper div holding the cards, so the cards are grandchildren —
-   * `:scope > div` would match the wrapper, not the cards.
+   * The expansion plan cards. The list renders an intro block followed by the
+   * card wrapper, so the cards are the children of that LAST wrapper — matching
+   * every grandchild would also pick up the intro block's own children.
    */
   get expansionPlanCards(): Locator {
-    return this.expansionPlanList.locator(':scope > div > div');
+    return this.expansionPlanList.locator(':scope > div').last().locator(':scope > div');
   }
 
   /** Opens the Expansion Plan tab and waits for the (async) plan list. */
@@ -278,6 +323,20 @@ export class CustomerAccountPage {
     await this.openTab('Expansion Plan');
     await this.expansionPlanList.waitFor({ state: 'visible', timeout: 60000 });
     await this.expansionPlanCards.first().waitFor({ state: 'visible', timeout: 30000 });
+    // The cards stream in one by one and count() does not retry, so callers
+    // would otherwise read a half-rendered list.
+    let previous = -1;
+    await expect
+      .poll(
+        async () => {
+          const current = await this.expansionPlanCards.count();
+          const settled = current > 0 && current === previous;
+          previous = current;
+          return settled;
+        },
+        { timeout: 60000, intervals: [1500] },
+      )
+      .toBe(true);
   }
 
   /** Opens the Expansion Coach modal for the nth expansion plan (0-based). */

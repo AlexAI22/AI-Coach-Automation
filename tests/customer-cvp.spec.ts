@@ -56,9 +56,12 @@ test.describe('Customer Value Portal (reused session)', () => {
     await expect(cvp.searchInput).toBeVisible();
     await expect(cvp.demoModeButton).toBeVisible();
 
-    // Currency selector exposes exactly the three supported currencies.
+    // The app now offers 11 display currencies, so assert the three this suite
+    // switches between are offered rather than pinning the whole list.
     await expect(cvp.currencySelect).toBeVisible();
-    await expect(cvp.currencySelect.locator('option')).toHaveText([/GBP/, /USD/, /EUR/]);
+    for (const code of ['GBP', 'USD', 'EUR']) {
+      await expect(cvp.currencySelect.locator('option', { hasText: code })).toHaveCount(1);
+    }
 
     expect(httpErrors, `Unexpected HTTP errors: ${JSON.stringify(httpErrors, null, 2)}`).toEqual([]);
   });

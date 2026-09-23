@@ -15,8 +15,9 @@ import { Page, Locator, expect } from '@playwright/test';
  *       Body                 -> the conversation area
  *       Footer / QuestionInput -> "Ask a custom question:" input + "Ask" button
  *
- * NOTE: the modal has no role="dialog", so everything is located through the
- * data-sentry-component hooks rather than ARIA roles.
+ * NOTE: the modal has no role="dialog", and the app no longer emits
+ * data-sentry-component hooks, so it is anchored on the body-level block that
+ * holds its controls and located from there by role, text and structure.
  */
 export class CoachMeModalPage {
   readonly page: Page;
@@ -150,37 +151,58 @@ export class CoachMeModalPage {
   constructor(page: Page) {
     this.page = page;
 
-    this.positioner = page.locator('[data-sentry-component="Positioner"]');
-    this.panel = page.locator('[data-sentry-component="Panel"]');
-    this.title = page.locator('[data-sentry-component="Title"]');
+    // The modal is a body-level block, not a role="dialog". Inner `has:`
+    // locators must be page-rooted: they resolve relative to the outer match.
+    const modal = page
+      .locator('body > div')
+      .filter({ has: page.getByRole('button', { name: 'Close modal' }) })
+      .filter({ has: page.getByRole('textbox') })
+      .last();
+
+    this.panel = modal
+      .locator('div')
+      .filter({ has: page.getByRole('button', { name: 'Close modal' }) })
+      .filter({ has: page.getByRole('textbox') })
+      .last();
+    this.positioner = this.panel.locator('xpath=..');
+    this.title = this.panel.locator(':scope > div').first();
     this.closeModalButton = this.title.getByRole('button', { name: 'Close modal' });
 
-    this.suggestedQuestions = page.locator('[data-sentry-component="SuggestedPrepSteps"]');
+    // The panel's two columns: the suggested questions, then the conversation.
+    const columns = this.panel
+      .locator('div')
+      .filter({ has: page.locator('button[aria-expanded]') })
+      .filter({ has: page.getByRole('textbox') })
+      .last();
+
+    this.suggestedQuestions = columns.locator(':scope > div').first();
     // Matched case-insensitively: the DOM text is "Suggested Questions", shown
     // uppercase via CSS.
     this.suggestedQuestionsHeader = this.suggestedQuestions.getByText(/^suggested questions$/i);
-    // Restricted to buttons OUTSIDE SuggestedPrepSteps: the panel's own
-    // disclosure header also reads "Suggested Questions", so a Panel-wide text
-    // match resolves to two elements and fails strict mode on click.
-    this.suggestedQuestionsToggle = this.panel
-      .locator('button:not([data-sentry-component="SuggestedPrepSteps"] *)')
-      .filter({ hasText: /^\s*(hide|show)\s*$/i });
+    this.suggestedQuestionsToggle = this.panel.getByRole('button', { name: /^(hide|show)$/i });
 
     this.suggestedQuestionsDisclosure = this.suggestedQuestions.locator('button[aria-expanded]');
     this.prompts = this.suggestedQuestions.locator('button:not([aria-expanded]):not([aria-label])');
 
-    this.contextBanner = page.locator('[data-sentry-component="ContextBanner"]');
-    this.body = page.locator('[data-sentry-component="Body"]');
-    this.footer = page.locator('[data-sentry-component="Footer"]');
-    this.questionInput = page.locator('[data-sentry-component="QuestionInput"]');
+    this.contextBanner = this.panel.getByText(/Session ready/).first();
+    this.body = columns.locator(':scope > div').nth(1);
+    this.questionInput = this.panel
+      .locator('div')
+      .filter({ has: page.getByRole('textbox') })
+      .filter({ has: page.getByRole('button', { name: 'Ask', exact: true }) })
+      .last();
+    this.footer = this.questionInput.locator('xpath=..');
     this.questionField = this.questionInput.getByRole('textbox');
-    this.askButton = this.questionInput.getByRole('button', { name: 'Ask' });
+    this.askButton = this.questionInput.getByRole('button', { name: 'Ask', exact: true });
 
     this.clearChatButton = this.panel.getByRole('button', { name: /clear chat/i });
     this.downloadConversationButton = this.panel.getByRole('button', { name: /download conversation/i });
 
-    this.userMessages = page.locator('[data-sentry-component="UserMessage"]');
-    this.assistantMessages = page.locator('[data-sentry-component="AssistantMessage"]');
+    // Turns carry no role or hook; the app distinguishes them only by the
+    // alignment of the bubble (sent right, received left).
+    const conversation = this.body.locator(':scope > div.overflow-y-auto');
+    this.userMessages = conversation.locator(':scope > div.justify-end');
+    this.assistantMessages = conversation.locator(':scope > div.justify-start');
   }
 
   /** A single prompt button, located by its exact text. */
@@ -254,20 +276,27 @@ export class CoachMeModalPage {
   /**
    * Waits for the assistant's answer and returns its text.
    *
-   * The answer is not streamed token-by-token — it appears in one go — but the
-   * length is still polled to a standstill so a partial render cannot be
-   * mistaken for a finished answer. "Ask" is NOT a completion signal: it goes
-   * back to disabled because submitting clears the input.
+   * The bubble is created as soon as the question is sent and shows a loading
+   * indicator, so its mere presence proves nothing — only a non-empty length
+   * that stops changing does. "Ask" is NOT a completion signal: it goes back to
+   * disabled because submitting clears the input.
    */
   async waitForAnswer(timeout = 420000): Promise<string> {
     const answer = this.assistantMessages.last();
     await answer.waitFor({ state: 'visible', timeout });
 
+    const deadline = Date.now() + timeout;
     let previous = -1;
     for (let stable = 0; stable < 3; ) {
+      if (Date.now() > deadline) {
+        throw new Error(
+          `The assistant answer did not finish rendering within ${timeout}ms ` +
+            `(last observed length: ${previous}).`,
+        );
+      }
       await this.page.waitForTimeout(2000);
-      const length = (await answer.innerText()).length;
-      stable = length === previous ? stable + 1 : 0;
+      const length = (await answer.innerText()).trim().length;
+      stable = length > 0 && length === previous ? stable + 1 : 0;
       previous = length;
     }
     return (await answer.innerText()).trim();
