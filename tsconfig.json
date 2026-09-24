@@ -11,5 +11,12 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["tests/**/*.ts", "pages/**/*.ts", "support/**/*.ts", "playwright.config.ts"]
+  "include": [
+    "tests/**/*.ts",
+    "pages/**/*.ts",
+    "support/**/*.ts",
+    "playwright.config.ts",
+    "playwright.config-ROMOB41258.ts",
+    "global-setup-ROMOB41258.ts"
+  ]
 }

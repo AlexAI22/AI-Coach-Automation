@@ -27,8 +27,6 @@ export class DraftChatPage {
   readonly chatNameInput: Locator;
   /** News Recency (days) field (a number spinbutton) */
   readonly newsRecencyInput: Locator;
-  /** Prompt selector (carries a default prompt) */
-  readonly promptSelector: Locator;
   /** Submit button */
   readonly createChatButton: Locator;
   /**
@@ -41,20 +39,20 @@ export class DraftChatPage {
     this.page = page;
     this.chatNameInput = page.getByLabel(/chat name/i);
     this.newsRecencyInput = page.getByLabel(/news recency/i);
-    this.promptSelector = page.locator('[data-sentry-component="PromptSelector"]');
     this.createChatButton = page.getByRole('button', { name: 'Create chat' });
     this.refineButton = page.getByRole('button', { name: 'Refine' });
   }
 
   /**
    * Agent card located by its title heading (e.g. "Customer Profile").
-   * Filtering on the exact heading avoids matching other cards (including the
-   * Legacy agents) whose description merely mentions the same words.
+   * `.last()` takes the innermost matching element, which is the card itself
+   * rather than the grid and page wrappers that also contain the heading.
    */
   agentCard(name: string): Locator {
     return this.page
-      .locator('[data-sentry-component="AgentCard"]')
-      .filter({ has: this.page.getByRole('heading', { name, exact: true }) });
+      .locator('div')
+      .filter({ has: this.page.getByRole('heading', { name, exact: true }) })
+      .last();
   }
 
   /** Opens the draft-chat form for the named agent. */

@@ -44,7 +44,13 @@ export class SalesCoachPage {
     this.closeWelcomeButton = page.getByRole('button', { name: 'Skip for now' });
     this.navLink = page.getByRole('link', { name: 'Sales Coach', exact: true });
     this.heading = page.getByTestId('page-header-title');
-    this.welcomeLanding = page.locator('[data-sentry-component="WelcomeLanding"]');
+    // Bounded by its first and last headings, which is what separates the
+    // landing block from the page wrappers that also contain them.
+    this.welcomeLanding = page
+      .locator('div')
+      .filter({ has: page.getByRole('heading', { name: 'Welcome to Sales Coach', exact: true }) })
+      .filter({ has: page.getByRole('heading', { name: 'Getting Started', exact: true }) })
+      .last();
     this.getStartedLink = page.getByRole('link', { name: 'Get Started' });
   }
 
@@ -87,15 +93,31 @@ export class SalesCoachPage {
 
   /** Opens a project from the sidebar and waits for the project view to load. */
   async selectProject(name: string): Promise<void> {
-    await this.projectLink(name).click();
+    const link = this.projectLink(name);
+    // The onboarding modal renders ~2.5s AFTER a navigation settles, so when a
+    // previous test leaves one in flight it can appear after the dismissal
+    // check and then swallow this click for the whole test timeout. Bound the
+    // click so that costs seconds, then dismiss what appeared and retry.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await this.dismissWelcomeDialog();
+      try {
+        await link.click({ timeout: 20000 });
+        await expect(this.page).toHaveURL(/\/sales-coach\/project/, { timeout: 20000 });
+        return;
+      } catch {
+        // Fall through: dismiss whatever intercepted the click, then retry.
+      }
+    }
+    await this.dismissWelcomeDialog();
+    await link.click();
     await expect(this.page).toHaveURL(/\/sales-coach\/project/);
   }
 
-  /** Sidebar folder (ProjectListItem) for a project, located by name. */
+  /** Sidebar list entry for a project, located by name. */
   projectFolder(name: string): Locator {
     return this.page
-      .locator('[data-sentry-component="ProjectListItem"]')
-      .filter({ hasText: name });
+      .locator('li')
+      .filter({ has: this.page.getByRole('link', { name: new RegExp(name, 'i') }) });
   }
 
   /** A chat link nested inside a project's sidebar folder (folder must be expanded). */

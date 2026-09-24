@@ -40,14 +40,33 @@ export class PersonalDigestPage {
     this.marketTrendsTab = page.getByRole('link', { name: 'Market Trends' });
     this.refreshButton = page.getByRole('button', { name: 'Refresh Digest' });
 
-    this.kpiCard = page.locator('[data-sentry-component="KpiCard"]');
-    this.newsSection = page.locator('[data-sentry-component="NewsSection"]');
-    this.newsItems = page.locator('[data-sentry-component="RelevantNewsItem"]');
+    // `.last()` takes the innermost match, which is the strip holding both
+    // KPIs rather than the page wrappers that also contain them.
+    this.kpiCard = page
+      .locator('div')
+      .filter({ hasText: 'Active Accounts' })
+      .filter({ hasText: 'Tracked Industries' })
+      .last();
+    // The section header alone also carries the title, so the section is
+    // identified by the article list it wraps.
+    this.newsSection = page
+      .locator('div')
+      .filter({ hasText: 'Featured News' })
+      .filter({ has: page.getByText('TOP STORY', { exact: true }) })
+      .last();
+    this.newsItems = this.newsSection.locator(':scope > div').last().locator(':scope > div');
     this.featuredNewsCount = this.newsSection.getByText(/\d+\s+articles?/);
     this.topStoryBadge = page.getByText('TOP STORY', { exact: true });
 
-    this.talkingPointsSection = page.locator('[data-sentry-component="TalkingPointsSection"]');
-    this.talkingPointItems = page.locator('[data-sentry-component="TalkingPointItem"]');
+    this.talkingPointsSection = page
+      .locator('div')
+      .filter({ hasText: 'Suggested Talking Points' })
+      .filter({ has: page.getByRole('button', { name: 'Copy talking point' }) })
+      .last();
+    this.talkingPointItems = this.talkingPointsSection
+      .locator(':scope > div')
+      .last()
+      .locator(':scope > div');
     this.copyButtons = page.getByRole('button', { name: 'Copy talking point' });
 
     this.welcomeDialogHeading = page.getByRole('heading', { name: 'Welcome to AI Coach', exact: true });

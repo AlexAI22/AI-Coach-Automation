@@ -63,9 +63,12 @@ async function authenticate(page: Page): Promise<void> {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   const loginPage = new LoginPage(page);
-  // The authenticated shell exposes a stable banner landmark. PropelAuth's
-  // login page does not, so this cannot match the login form.
-  const appShell = page.getByRole('banner');
+  // The PropelAuth login page renders a banner landmark too, so the banner
+  // alone cannot tell the two apps apart — it must carry the signed-in user
+  // menu, which only the authenticated shell has.
+  const appShell = page
+    .getByRole('banner')
+    .filter({ has: page.getByRole('button', { name: 'User menu' }) });
 
   // Staging redirects to PropelAuth when the session is missing or expired, but
   // that redirect is CLIENT-SIDE and happens after domcontentloaded. Reading

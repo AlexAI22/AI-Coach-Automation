@@ -72,7 +72,8 @@ test.describe('Personal Digest — Daily Digest (reused session)', () => {
     // source in a new tab.
     for (let i = 0; i < count; i++) {
       const item = items.nth(i);
-      await expect(item.locator('[data-sentry-component="relevanceBadge"]')).toBeVisible();
+      // The relevance badge renders as its level text.
+      await expect(item.getByText(/^(HIGH|MEDIUM|LOW)$/)).toBeVisible();
       const link = item.getByRole('link').first();
       await expect(link).toHaveAttribute('href', /^https?:\/\//);
       await expect(link).toHaveAttribute('target', '_blank');
