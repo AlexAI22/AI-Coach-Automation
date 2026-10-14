@@ -101,6 +101,11 @@ Feature: Sales Coach
   # The "Research Agent" legacy card is "Coming soon" (disabled) and is
   # intentionally not covered by a creation scenario.
 
+  # Exporting a finished agent response is specified separately, in
+  # features/download-agent-response.feature (tests/downloadAgentResponse.spec.ts):
+  # it is read-only and runs against a project whose chats already hold a
+  # response, so it triggers no AI run.
+
   # Notes on the created chat name:
   #  - The Chat name field caps input at 50 characters, so a long requested name
   #    (e.g. for "Upsell & Cross Sell") is truncated; the truncated value is what

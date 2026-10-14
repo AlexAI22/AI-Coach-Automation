@@ -23,19 +23,22 @@ Feature: Login
     And the Password field is visible
     And the "Log in with email" button is visible
     And the "Forgot password?" link is visible
-    And the "Sign in with SSO" link is visible
     And the "Sign up" link is visible
+    # Present in the DOM but hidden by default (opacity:0; pointer-events:none),
+    # so it is asserted as ATTACHED rather than visible.
+    And the "Sign in with SSO" link is attached to the page
 
   Scenario: Reject invalid credentials and keep the user on the login page
     When I log in with email "invalid@test.com" and password "WrongPassword123!"
-    Then a form-level error is shown (no account found / account locked)
-    And the URL still matches "/login"
+    Then the URL still matches "/login"
     And the "Log in with email" button is still visible
+    And the Email field is still visible
 
-  Scenario: Show inline errors when submitting empty fields
+  Scenario: Do not authenticate when submitting empty fields
     When I submit the login form with both fields empty
-    Then an inline email error "Email required" is shown
-    And an inline password error "Password required" is shown
+    Then the URL still matches "/login"
+    And the Email field is still visible
+    And the Password field is still visible
 
   Scenario: Navigate to the Forgot Password page
     When I click the "Forgot password?" link
@@ -45,7 +48,14 @@ Feature: Login
     When I click the "Sign up" link
     Then the URL matches "/signup"
 
-  # Successful, credentialed login is covered separately: support/session.ts
-  # logs in once per run, in the shared window, and sales-coach.spec.ts asserts
-  # the app is reached without re-logging in. Tracing is off by default so real
-  # credentials are never captured in a trace artifact.
+  # Notes:
+  #  - THE FAILURE SCENARIOS ASSERT BEHAVIOUR, NOT MESSAGES. PropelAuth no
+  #    longer renders a locatable inline/form-level error node (it used to show
+  #    "Email required" / "Password required" and a no-account-found banner), so
+  #    the scenarios prove what matters - the user is NOT authenticated and the
+  #    form is still there - instead of waiting out a timeout on a message the
+  #    provider can reword or drop at any time.
+  #  - Successful, credentialed login is covered separately: support/session.ts
+  #    logs in once per run, in the shared window, and sales-coach.spec.ts
+  #    asserts the app is reached without re-logging in. Tracing is off by
+  #    default so real credentials are never captured in a trace artifact.
