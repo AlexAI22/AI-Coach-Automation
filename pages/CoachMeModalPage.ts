@@ -73,6 +73,14 @@ export class CoachMeModalPage {
   /** Toolbar actions above the conversation. */
   readonly clearChatButton: Locator;
   readonly downloadConversationButton: Locator;
+  /** "Attachments (N)" toolbar button — disabled while nothing is attached. */
+  readonly attachmentsButton: Locator;
+  /** "Upload materials" toolbar button (backed by a hidden file input). */
+  readonly uploadMaterialsButton: Locator;
+  /** The "Attached:" label above the session-ready banner. */
+  readonly attachedLabel: Locator;
+  /** The empty-conversation hint shown before any question is asked. */
+  readonly emptyState: Locator;
 
   /** Conversation turns. */
   readonly userMessages: Locator;
@@ -197,6 +205,10 @@ export class CoachMeModalPage {
 
     this.clearChatButton = this.panel.getByRole('button', { name: /clear chat/i });
     this.downloadConversationButton = this.panel.getByRole('button', { name: /download conversation/i });
+    this.attachmentsButton = this.panel.getByRole('button', { name: /^attachments \(\d+\)$/i });
+    this.uploadMaterialsButton = this.panel.getByRole('button', { name: 'Upload materials', exact: true });
+    this.attachedLabel = this.panel.getByText('Attached:', { exact: true });
+    this.emptyState = this.panel.getByText(CoachMeModalPage.EMPTY_STATE, { exact: true });
 
     // Turns carry no role or hook; the app distinguishes them only by the
     // alignment of the bubble (sent right, received left).
@@ -266,9 +278,13 @@ export class CoachMeModalPage {
    * input (which is what enables "Ask"). The question is sent by pressing Ask.
    */
   async askSuggestedQuestion(text: string): Promise<void> {
-    await this.prompt(text).click();
-    // The click's whole visible effect: the prompt lands in the input verbatim.
-    await expect(this.questionField).toHaveValue(text);
+    // After "Clear chat" a new session is created; a prompt clicked before it
+    // is ready is ignored, so retry the click until the input is populated.
+    await expect(async () => {
+      await this.prompt(text).click();
+      // The click's whole visible effect: the prompt lands in the input verbatim.
+      await expect(this.questionField).toHaveValue(text, { timeout: 3000 });
+    }).toPass({ timeout: 30000 });
     await expect(this.askButton).toBeEnabled();
     await this.askButton.click();
   }

@@ -11,9 +11,11 @@ import { hasCredentials } from '../support/credentials';
  * expansion plan's "Coach Me" button -> the "Expansion Coach" modal -> its
  * "Suggested Questions" panel.
  *
- * SCOPE: the prompt TEXT only — that every Coach Me button in the section
- * offers the expected suggested questions. No prompt is clicked, so no AI run
- * is triggered.
+ * SCOPE: the tab's static copy (intro paragraph, Salesforce controls) asserted
+ * verbatim, each plan card's structure (title, "AI" badge, "Last updated"
+ * date, "Next step:" description, action buttons), and the prompt TEXT that
+ * every Coach Me button offers. No prompt is clicked, so no AI run is
+ * triggered.
  *
  * The plans themselves are AI-generated and carry a "Last updated" date, so
  * their titles and count change over time. The suite therefore discovers the
@@ -22,11 +24,21 @@ import { hasCredentials } from '../support/credentials';
  * these four questions.
  */
 
-const CUSTOMER = { id: '0009626222', name: 'Ballyvesey Industries Ltd' };
+const CUSTOMER = { id: '0009623781', region: 'EMEA', name: 'Inflexion Buyout V Investments LP' };
 const EXPECTED_PROMPTS = CoachMeModalPage.EXPANSION_QUESTIONS;
 
 /** The panel copy documents "3-5 strategic growth actions" per account. */
 const PLAN_COUNT_RANGE = { min: 1, max: 5 };
+
+/** Static (non-AI) copy of the Expansion Plan tab — asserted verbatim. */
+const EXPANSION_INTRO =
+  "Plans are automatically generated based on this account's invoiced spend, open pipeline, and " +
+  'AI-driven upsell signals. Each plan is tailored to the account\'s profile (e.g. cloud-heavy, ' +
+  'device-centric, security-focused) and highlights 3–5 strategic growth actions across Microsoft ' +
+  'Copilot, AI, Security, and Device as a Service.';
+
+/** e.g. "Last updated: 20 Jul 2026". */
+const LAST_UPDATED = /^Last updated: \d{1,2} [A-Z][a-z]{2} \d{4}$/;
 
 test.describe(`Expansion Plan Coach Me prompts — ${CUSTOMER.name}`, () => {
   test.describe.configure({ mode: 'serial' });
@@ -39,7 +51,7 @@ test.describe(`Expansion Plan Coach Me prompts — ${CUSTOMER.name}`, () => {
     test.setTimeout(180000);
     account = new CustomerAccountPage(sharedPage);
     coach = new CoachMeModalPage(sharedPage);
-    await account.goto(CUSTOMER.id);
+    await account.goto(CUSTOMER.id, CUSTOMER.region);
     await account.openExpansionPlanTab();
   });
 
@@ -69,6 +81,55 @@ test.describe(`Expansion Plan Coach Me prompts — ${CUSTOMER.name}`, () => {
     }
 
     expect(httpErrors, `Unexpected HTTP errors: ${JSON.stringify(httpErrors, null, 2)}`).toEqual([]);
+  });
+
+  test('should display the Expansion Plan intro text verbatim', async () => {
+    await expect(account.expansionPlanIntro).toHaveText(EXPANSION_INTRO);
+  });
+
+  test('should display the Salesforce connection controls', async () => {
+    await expect(account.connectSalesforceButton).toBeVisible();
+    await expect(account.connectSalesforceButton).toBeEnabled();
+    // The test account never completes Salesforce SSO.
+    await expect(account.salesforceStatus).toHaveText('Salesforce not connected');
+  });
+
+  test('every expansion plan card should display its full text and actions', async () => {
+    const count = await account.expansionPlanCards.count();
+    expect(count, 'No expansion plans found, so no card text was checked').toBeGreaterThan(0);
+
+    for (let i = 0; i < count; i++) {
+      const card = account.expansionPlanCards.nth(i);
+      const title = (await card.getByRole('heading', { level: 3 }).innerText()).trim();
+
+      await test.step(`plan ${i + 1}: ${title}`, async () => {
+        expect(title, 'Plan title is empty').not.toBe('');
+
+        // "AI" badge, with its hover hint.
+        const badge = card.locator('span[title="AI-suggested"]');
+        await expect(badge).toHaveText('AI');
+
+        await expect(card.getByText(/^Last updated:/)).toHaveText(LAST_UPDATED);
+
+        // AI-generated pitch: content varies, but it always closes with a next step.
+        const description = card.locator('p');
+        await expect(description).toHaveCount(1);
+        await expect(description).toContainText('Next step:');
+
+        for (const action of ['Send to Salesforce as a Lead', 'Coach Me', 'Show AI catalogue mapping']) {
+          const button = card.getByRole('button', { name: action, exact: true });
+          await expect(button, `"${action}" missing`).toBeVisible();
+          await expect(button, `"${action}" disabled`).toBeEnabled();
+        }
+      });
+    }
+  });
+
+  test('should list expansion plans with unique titles', async () => {
+    const titles = (await account.expansionPlanCards.getByRole('heading', { level: 3 }).allInnerTexts()).map((t) =>
+      t.trim(),
+    );
+    expect(new Set(titles).size, `Duplicate plan titles: ${JSON.stringify(titles)}`).toBe(titles.length);
   });
 
   test('every Coach Me button should open an Expansion Coach modal offering the four suggested questions', async () => {

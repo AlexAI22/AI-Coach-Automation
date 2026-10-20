@@ -222,8 +222,10 @@ export class CustomerAccountPage {
    * so each spec stays runnable in isolation. It costs nothing when the account
    * page loads normally.
    */
-  async goto(id = '0009623781'): Promise<void> {
-    const url = `${CustomerAccountPage.PATH}?id=${id}&id_type=SourceGGP`;
+  async goto(id = '0009623781', region?: string): Promise<void> {
+    const params = new URLSearchParams({ id, id_type: 'SourceGGP' });
+    if (region) params.set('id_region', region);
+    const url = `${CustomerAccountPage.PATH}?${params.toString()}`;
     this.openedCustomerId = id;
     const portal = new CustomerValuePortalPage(this.page);
     // ensureCustomersLoaded() is slow (it waits out the list endpoint), so it
@@ -304,6 +306,16 @@ export class CustomerAccountPage {
     return this.tabs.getByRole('button', { name, exact: true });
   }
 
+  /**
+   * A card on the FFA tab, located by its h3 title. The card is the bordered
+   * rounded-xl wrapper (step number + title + description + Coach Me button).
+   */
+  ffaCard(title: string): Locator {
+    return this.tabPanel
+      .locator('div.rounded-xl')
+      .filter({ has: this.page.getByRole('heading', { level: 3, name: title, exact: true }) });
+  }
+
   /** An opportunity card on the Opportunities tab, located by its title. */
   opportunityCard(title: string): Locator {
     return this.opportunityCards.filter({ hasText: title });
@@ -313,9 +325,32 @@ export class CustomerAccountPage {
    * The expansion plan cards. The list renders an intro block followed by the
    * card wrapper, so the cards are the children of that LAST wrapper — matching
    * every grandchild would also pick up the intro block's own children.
+   *
+   * The wrapper is identified by containing Coach Me buttons: the Salesforce
+   * connect block is also a direct child div and, while the plans are still
+   * loading, it is the LAST one — so `.last()` alone matched it as "2 cards".
    */
   get expansionPlanCards(): Locator {
-    return this.expansionPlanList.locator(':scope > div').last().locator(':scope > div');
+    return this.expansionPlanList
+      .locator(':scope > div')
+      .filter({ has: this.page.getByRole('button', { name: 'Coach Me' }) })
+      .last()
+      .locator(':scope > div');
+  }
+
+  /** The explanatory paragraph at the top of the Expansion Plan tab. */
+  get expansionPlanIntro(): Locator {
+    return this.expansionPlanList.locator(':scope > p').first();
+  }
+
+  /** "Connect Salesforce (SSO)" button above the expansion plans. */
+  get connectSalesforceButton(): Locator {
+    return this.expansionPlanList.getByRole('button', { name: 'Connect Salesforce (SSO)', exact: true });
+  }
+
+  /** Salesforce connection status pill (e.g. "Salesforce not connected"). */
+  get salesforceStatus(): Locator {
+    return this.expansionPlanList.getByRole('status');
   }
 
   /** Opens the Expansion Plan tab and waits for the (async) plan list. */
@@ -342,6 +377,13 @@ export class CustomerAccountPage {
   /** Opens the Expansion Coach modal for the nth expansion plan (0-based). */
   async openExpansionCoachMe(index: number): Promise<void> {
     await this.expansionPlanCards.nth(index).getByRole('button', { name: 'Coach Me' }).click();
+  }
+
+  /** The Expansion Plan card whose heading is exactly `title`. */
+  expansionPlanCard(title: string): Locator {
+    return this.expansionPlanCards.filter({
+      has: this.page.getByRole('heading', { name: title, exact: true }),
+    });
   }
 
   /**

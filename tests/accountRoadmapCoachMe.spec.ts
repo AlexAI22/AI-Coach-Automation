@@ -11,7 +11,9 @@ import { hasCredentials } from '../support/credentials';
  * single "Coach Me" button below the context accordions -> the "Account Roadmap
  * Coach" modal -> its "Suggested Questions" panel.
  *
- * SCOPE: the prompt TEXT only. No prompt is clicked, so no AI run is triggered.
+ * SCOPE: the tab's static copy (heading, intro, context accordions, Coach Me
+ * call-to-action, Client Roadmap upload area) asserted verbatim, plus the
+ * prompt TEXT of the modal. No prompt is clicked, so no AI run is triggered.
  *
  * This is the third Coach Me variant in the app and each one differs:
  *   Opportunities   "AI Coach — <opportunity>"        7 prompts, has a context banner
@@ -20,9 +22,23 @@ import { hasCredentials } from '../support/credentials';
  * Note this modal's title carries NO trailing subject at all.
  */
 
-const CUSTOMER = { id: '0009626222', name: 'Ballyvesey Industries Ltd' };
+const CUSTOMER = { id: '0009623781', region: 'EMEA', name: 'Inflexion Buyout V Investments LP' };
 const EXPECTED_PROMPTS = CoachMeModalPage.ROADMAP_QUESTIONS;
 const MODAL_TITLE = 'Account Roadmap Coach';
+
+/** Static (non-AI) copy of the Account Roadmap tab — asserted verbatim. */
+const ROADMAP_TEXT = {
+  heading: 'Account Roadmap',
+  intro: 'Review the context below, then use Coach Me to prepare your pitch',
+  introEmphasis: 'Coach Me',
+  coachMeLead: 'Prep your roadmap conversation — what to cover, what to expect, and how to get buy-in',
+  coachMeButton: 'Coach Me',
+  clientRoadmapHeading: 'Client Roadmap',
+  clientRoadmapDescription: "Upload the client's strategic roadmap to auto-generate opportunities.",
+  dropzoneTitle: 'Drop roadmap file here or click to browse',
+  dropzoneHint: 'Supports .xlsx',
+  acceptedFileTypes: '.xlsx',
+};
 
 // The assertions are read-only, so they run serially against one modal opened
 // in the first test rather than re-navigating for each.
@@ -37,7 +53,7 @@ test.describe(`Account Roadmap Coach Me prompts — ${CUSTOMER.name}`, () => {
     test.setTimeout(180000);
     account = new CustomerAccountPage(sharedPage);
     coach = new CoachMeModalPage(sharedPage);
-    await account.goto(CUSTOMER.id);
+    await account.goto(CUSTOMER.id, CUSTOMER.region);
     await account.openAccountRoadmapTab();
   });
 
@@ -52,7 +68,7 @@ test.describe(`Account Roadmap Coach Me prompts — ${CUSTOMER.name}`, () => {
     const httpErrors = watchHttpErrors(page);
 
     await expect(account.accountRoadmap.getByRole('heading', { name: 'Account Roadmap' })).toBeVisible();
-    await expect(account.accountRoadmap).toContainText('Review the context below, then use');
+    await expect(account.accountRoadmap.getByText(ROADMAP_TEXT.intro, { exact: true })).toBeVisible();
 
     // The four context accordions the coach draws on.
     await expect(account.roadmapSections).toHaveCount(CustomerAccountPage.ROADMAP_SECTIONS.length);
@@ -65,6 +81,56 @@ test.describe(`Account Roadmap Coach Me prompts — ${CUSTOMER.name}`, () => {
     await expect(account.accountRoadmapCoachMeButton).toBeEnabled();
 
     expect(httpErrors, `Unexpected HTTP errors: ${JSON.stringify(httpErrors, null, 2)}`).toEqual([]);
+  });
+
+  test('should display the heading and intro text verbatim', async () => {
+    const roadmap = account.accountRoadmap;
+    await expect(roadmap.getByRole('heading', { level: 1 })).toHaveText(ROADMAP_TEXT.heading);
+    const intro = roadmap.getByText(ROADMAP_TEXT.intro, { exact: true });
+    await expect(intro).toHaveText(ROADMAP_TEXT.intro);
+    // "Coach Me" is emphasised inside the sentence.
+    await expect(intro.locator('span', { hasText: ROADMAP_TEXT.introEmphasis })).toHaveText(
+      ROADMAP_TEXT.introEmphasis,
+    );
+  });
+
+  test('should list the context accordions verbatim, in order, all collapsed', async () => {
+    const headers = account.roadmapSections.getByRole('button');
+    await expect(headers).toHaveText(CustomerAccountPage.ROADMAP_SECTIONS);
+    for (const section of CustomerAccountPage.ROADMAP_SECTIONS) {
+      await test.step(section, async () => {
+        const header = account.roadmapSection(section).getByRole('button').first();
+        await expect(header).toBeEnabled();
+        // Collapsed: the section is just its header, no expanded body.
+        await expect(account.roadmapSection(section).locator(':scope > *')).toHaveCount(1);
+      });
+    }
+  });
+
+  test('should display the Coach Me call-to-action text verbatim', async () => {
+    const roadmap = account.accountRoadmap;
+    // The lead text has a <br>; innerText turns it into whitespace, which
+    // toHaveText normalises to a single space.
+    await expect(roadmap.locator('p', { hasText: 'Prep your roadmap conversation' })).toHaveText(
+      ROADMAP_TEXT.coachMeLead,
+      { useInnerText: true },
+    );
+    await expect(account.accountRoadmapCoachMeButton).toHaveText(ROADMAP_TEXT.coachMeButton);
+    await expect(account.accountRoadmapCoachMeButton).toBeEnabled();
+  });
+
+  test('should display the Client Roadmap upload area text verbatim', async () => {
+    const roadmap = account.accountRoadmap;
+    await expect(roadmap.getByRole('heading', { level: 2, name: ROADMAP_TEXT.clientRoadmapHeading, exact: true }))
+      .toBeVisible();
+    await expect(roadmap.getByText(ROADMAP_TEXT.clientRoadmapDescription, { exact: true })).toBeVisible();
+
+    const dropzone = roadmap.getByRole('button', { name: new RegExp(`^${ROADMAP_TEXT.dropzoneTitle}`) });
+    await expect(dropzone).toHaveCount(1);
+    await expect(dropzone.getByText(ROADMAP_TEXT.dropzoneTitle, { exact: true })).toBeVisible();
+    await expect(dropzone.getByText(ROADMAP_TEXT.dropzoneHint, { exact: true })).toBeVisible();
+    // The hidden file input only accepts .xlsx.
+    await expect(dropzone.locator('input[type="file"]')).toHaveAttribute('accept', ROADMAP_TEXT.acceptedFileTypes);
   });
 
   test(`should open the "${MODAL_TITLE}" modal from the Coach Me button`, async () => {
