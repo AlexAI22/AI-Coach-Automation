@@ -262,10 +262,11 @@ test.describe('Customer Value Portal — Account navigation (reused session)', (
   });
 });
 
-// Demo customers whose account pages the detail suite runs against. Add more
-// { id, name } entries to extend coverage.
+// Customers whose account pages the detail suite runs against. Add more
+// { id, region, name } entries to extend coverage. The region is required: a
+// deep link without `id_region` bounces to the portal list for this customer.
 const ACCOUNTS = [
-  { id: '0009623781', name: 'Inflexion Buyout V Investments LP' },
+  { id: '0009623781', region: 'EMEA', name: 'Inflexion Buyout V Investments LP' },
 ];
 
 // The detail assertions are read-only, so for each customer they run serially
@@ -284,7 +285,7 @@ for (const customer of ACCOUNTS) {
       if (!hasCredentials()) return; // tests skip below
       test.setTimeout(120000); // account view can need several reloads to mount
       account = new CustomerAccountPage(sharedPage);
-      await account.goto(customer.id);
+      await account.goto(customer.id, customer.region);
     });
 
     test.beforeEach(() => {
