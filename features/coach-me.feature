@@ -6,14 +6,14 @@
 # maps onto a test case, so the counts here match `--list`.
 #
 #   Feature                  Spec                                        Cases  AI runs
+#   FFA prompts              tests/coachMeFFA.spec.ts                       20        0
+#   FFA answers              tests/coachMeFFAAnswers.spec.ts                 8        8
 #   Expansion Plan prompts   tests/expansionPlanCoachMe.spec.ts             12        0
 #   Expansion Plan answers   tests/expansionPlanCoachMeAnswers.spec.ts       1        4
 #   Account Roadmap prompts  tests/accountRoadmapCoachMe.spec.ts            21        0
 #   Account Roadmap answers  tests/accountRoadmapCoachMeAnswers.spec.ts      1        8
-#                                                                  total    35       12
+#                                                                  total    63       20
 #
-#   @disabled  FFA prompts            tests/coachMeFFA.spec.ts                  (commented out, 20 cases)
-#   @disabled  FFA answers            tests/coachMeFFAAnswers.spec.ts           (commented out, 8 cases)
 #   @disabled  Opportunities prompts  tests/coachMeOpportunities.spec.ts        (commented out)
 #   @disabled  Opportunities answers  tests/coachMeOpportunitiesAnswers.spec.ts (commented out)
 #
@@ -24,10 +24,13 @@
 # replaces the worker - and relaunches the browser - after every failed test,
 # so one-test-per-prompt reopened the browser whenever a prompt failed.
 #
-# The Opportunities and FFA suites are commented out on request (Oct 2026);
-# their scenarios are kept below for when they are re-enabled.
+# The two Opportunities suites are commented out on request (Oct 2026); their
+# scenarios are kept below, tagged @disabled, for when they are re-enabled.
+# The FFA tab moved within the account tab strip (Oct 2026); the specs select
+# it by name, so its position does not matter.
 # NOTE: the npm scripts test:coach-me, test:coach-me:all, :answers and
-# :everything still point at the disabled Opportunities specs.
+# :everything still point at the disabled Opportunities specs and do NOT include
+# the FFA specs - run the FFA specs by path.
 #
 # ----------------------------------------------------------------------------
 # Preconditions shared by EVERY scenario
@@ -125,7 +128,6 @@
 # ----------------------------------------------------------------------------
 # tests/coachMeFFA.spec.ts — 20 cases. Prompt and modal text only; no prompt is clicked.
 # ----------------------------------------------------------------------------
-@disabled
 Feature: Coach Me - FFA suggested question prompts
   As an authenticated AI Coach user
   I want the FFA Coach Me modal to offer a fixed set of coaching questions
@@ -236,7 +238,6 @@ Feature: Coach Me - FFA suggested question prompts
 # ----------------------------------------------------------------------------
 # tests/coachMeFFAAnswers.spec.ts — 8 cases (8 AI runs), one per prompt.
 # ----------------------------------------------------------------------------
-@disabled
 Feature: Coach Me - FFA answers
   As an authenticated AI Coach user
   I want each FFA suggested question to return a usable coaching answer

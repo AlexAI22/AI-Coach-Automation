@@ -4,7 +4,7 @@ End-to-end UI test automation for the **AI Coach** application (staging), built 
 [Playwright](https://playwright.dev/) and TypeScript. The suite covers the PropelAuth
 login flow and the authenticated app: **Sales Coach** (agents, chat creation, response
 download), **Personal Digest**, the **Customer Value Portal** and the account-level
-**Coach Me** assistants (Expansion Plan, Account Roadmap). It uses the Page Object
+**Coach Me** assistants (FFA, Expansion Plan, Account Roadmap). It uses the Page Object
 Model, a single shared browser window, and a reused authentication session.
 
 - **App under test:** `https://stage-aicoach.insight.com` (staging)
@@ -122,9 +122,16 @@ Each suite has a plain, a `:headed` and (mostly) a `:secure` variant, e.g.
 | `npm run test:coach-me:everything` | all six of the above | Prompts and answers together |
 | `npm run report` | | Open the last HTML report |
 
-> **Opportunities and FFA Coach Me are disabled.** `coachMeOpportunities*.spec.ts`
-> and `coachMeFFA*.spec.ts` are fully commented out, so `test:coach-me` /
-> `test:coach-me-answers` currently run no tests. Uncomment a file to re-enable it.
+The **FFA** Coach Me specs have no npm script yet; run them directly:
+
+```bash
+npx playwright test tests/coachMeFFA.spec.ts          # read-only prompts
+npx playwright test tests/coachMeFFAAnswers.spec.ts   # AI answers
+```
+
+> **Opportunities Coach Me is disabled.** `coachMeOpportunities.spec.ts` and
+> `coachMeOpportunitiesAnswers.spec.ts` are fully commented out, so
+> `test:coach-me` / `test:coach-me-answers` currently run no tests.
 
 ### Test categories and cost
 
@@ -227,7 +234,7 @@ credentials are never stored in the repository.
 │   ├── DraftChatPage.ts                # Project view (agent cards) and the draft-chat form
 │   ├── PersonalDigestPage.ts           # Personal Digest → Daily Digest / Market Trends
 │   ├── CustomerValuePortalPage.ts      # Customer list, search, Demo Mode, currency, pagination
-│   ├── CustomerAccountPage.ts          # Account detail: KPIs, tabs (Opportunities, FFA, Expansion Plan, Account Roadmap, …)
+│   ├── CustomerAccountPage.ts          # Account detail: KPIs, tabs (Expansion Plan, Opportunities, Account Roadmap, Deep Dive, FFA, …)
 │   └── CoachMeModalPage.ts             # Coach Me modal: suggested questions, Ask, answers, Clear chat
 ├── tests/
 │   ├── login-success.spec.ts           # Login form (logged-out `anonPage`)
@@ -235,7 +242,8 @@ credentials are never stored in the repository.
 │   ├── downloadAgentResponse.spec.ts   # .docx export of every agent chat in a project
 │   ├── personal-digest.spec.ts         # Daily Digest
 │   ├── customer-cvp.spec.ts            # Customer Value Portal + account detail
-│   ├── coachMeFFA*.spec.ts             # FFA Coach Me prompts + answers (currently disabled)
+│   ├── coachMeFFA.spec.ts              # FFA Coach Me prompts (read-only)
+│   ├── coachMeFFAAnswers.spec.ts       # FFA Coach Me AI answers
 │   ├── expansionPlanCoachMe.spec.ts    # Expansion Plan Coach Me prompts (read-only)
 │   ├── expansionPlanCoachMeAnswers.spec.ts
 │   ├── accountRoadmapCoachMe.spec.ts   # Account Roadmap Coach Me prompts (read-only)

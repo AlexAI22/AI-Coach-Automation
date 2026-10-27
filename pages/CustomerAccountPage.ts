@@ -77,10 +77,12 @@ export class CustomerAccountPage {
 
   /** The tab strip labels, in render order. */
   static readonly TAB_NAMES = [
-    'Opportunities',
     'Expansion Plan',
+    'Opportunities',
     'Account Roadmap',
     'Microsoft Deep Dive',
+    'FFA',
+    'Submission Tracker',
   ];
 
   /** Currency code -> symbol shown in the value cells. */
