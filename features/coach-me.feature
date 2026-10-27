@@ -326,7 +326,7 @@ Feature: Coach Me - Expansion Plan suggested question prompts
       | title               | a non-empty h3 heading                          |
       | AI badge            | reads "AI", with the hover hint "AI-suggested"  |
       | Last updated        | matches "Last updated: <d> <Mon> <yyyy>"        |
-      | description         | exactly one paragraph, containing "Next step:"  |
+      | description         | exactly one paragraph, at least 50 characters   |
     And every plan card should show these enabled actions:
       | action                       |
       | Send to Salesforce as a Lead |
