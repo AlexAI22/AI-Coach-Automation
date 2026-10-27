@@ -39,7 +39,7 @@ Feature: Personal Digest - Daily Digest
     Then the Featured News section should be visible
     And the "N articles" counter should equal the number of news items shown
     And exactly one news item should be flagged as the "TOP STORY"
-    And every news item should show a relevance badge
+    And every news item should show a relevance badge reading "HIGH", "MEDIUM" or "LOW"
     And every news item title should link to an external source
     And every news link should open in a new tab with rel "noopener"
 

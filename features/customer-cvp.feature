@@ -18,6 +18,10 @@
 #    typed with Demo Mode on appears to do nothing at all. They run as a group
 #    and switch Demo Mode back on afterwards, because it is shared by the run's
 #    single window and every later scenario needs the sample customers.
+#    Being the only scenarios tied to REAL data, they are the likeliest to fail
+#    on CI while passing locally; a count of 0 for "2E2" most likely means the
+#    CI account (AICOACH_EMAIL secret) cannot see that customer, and the
+#    failure message says so.
 #  - A ROW COUNT OF ZERO IS AMBIGUOUS. While a list or search request is in
 #    flight the rows are replaced by SkeletonRow placeholders, a DIFFERENT
 #    component, so "no rows" also means "still loading". Scenarios asserting an
@@ -42,8 +46,11 @@ Feature: Customer Value Portal
     And the "Manage and track your Microsoft customer relationships" description should be visible
     And the customer search box should be visible
     And the "Demo Mode" button should be visible
-    And the currency selector should offer "GBP", "USD" and "EUR"
+    And the currency selector should offer "GBP", "USD" and "EUR" among its currencies
     And no HTTP 4xx or 5xx errors should have occurred while the page loaded
+
+  # Note: the selector now offers 11 display currencies, so only the three the
+  # suite switches between are asserted, rather than pinning the whole list.
 
   Scenario: Render the customer table with all column headers
     Then the customer table header should be visible
