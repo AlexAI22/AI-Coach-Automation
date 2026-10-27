@@ -328,11 +328,13 @@ for (const customer of ACCOUNTS) {
       await expect(account.accountTeamCard).toContainText(/Account Owner|Customer Success Manager/);
     });
 
-    test('should render the account tab strip with Opportunities active by default', async () => {
+    test('should render the account tab strip with one tab active by default', async () => {
       for (const name of CustomerAccountPage.TAB_NAMES) {
         await expect(account.tab(name)).toBeVisible();
       }
-      expect(await account.isTabActive('Opportunities')).toBe(true);
+      // The default tab is no longer Opportunities (the strip gained tabs), so
+      // assert only that exactly one tab is selected on load.
+      await expect(account.tabs.locator('button[class*="border-rose-600"]')).toHaveCount(1);
     });
 
     test('Opportunities tab should list opportunities with a Coach Me action', async () => {

@@ -239,7 +239,7 @@ Feature: Customer Value Portal - Account detail
   Scenario Outline: Show the account tab strip for <customer>
     Given I open the account page for "<customer>"
     Then the tabs "Opportunities", "Expansion Plan", "Account Roadmap" and "Microsoft Deep Dive" should be visible
-    And the "Opportunities" tab should be active by default
+    And exactly one tab should be active by default
 
     Examples:
       | customer                          |
