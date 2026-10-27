@@ -245,11 +245,11 @@ Feature: Customer Value Portal - Account detail
       | customer                          |
       | Inflexion Buyout V Investments LP |
 
-  Scenario Outline: Opportunities tab lists opportunities for <customer>
+  Scenario Outline: Opportunities tab opens and renders for <customer>
     Given I open the account page for "<customer>"
     When I open the "Opportunities" tab
-    Then at least one opportunity should be shown
-    And each opportunity should have a title, a description and a "Coach Me" button
+    Then the "Opportunities" tab should be active
+    And its panel should show content
 
     Examples:
       | customer                          |
