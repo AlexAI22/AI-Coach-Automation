@@ -5,9 +5,8 @@ import { watchHttpErrors } from './support/httpErrors';
 import { hasCredentials } from '../support/credentials';
 
 /**
- * Expansion Plan — Coach Me: run every suggested question of the
- * "Copilot-Powered Productivity & AI Adoption Program" plan and check the
- * agent's answer.
+ * Expansion Plan — Coach Me: run every suggested question of the first listed
+ * expansion plan and check the agent's answer.
  *
  * All prompts run in ONE test (one browser session), a step per prompt.
  *
@@ -17,9 +16,8 @@ import { hasCredentials } from '../support/credentials';
  *
  * Only this one plan's Coach Me is exercised: the four prompts are identical
  * on every plan, and the prompt text for all plans is covered by the read-only
- * expansionPlanCoachMe.spec.ts. The plan is located by its exact title; plans
- * are AI-generated, so if it is regenerated under a new name the suite fails
- * with a message saying to update PLAN_TITLE.
+ * expansionPlanCoachMe.spec.ts. Plans are AI-generated and get regenerated
+ * under new titles, so the first card is used and its title read at runtime.
  *
  * Answers are non-deterministic prose, so the hard assertions cover properties
  * every valid answer must have (completes, question echoed verbatim, exactly
@@ -29,7 +27,6 @@ import { hasCredentials } from '../support/credentials';
  */
 
 const CUSTOMER = { id: '0009623781', region: 'EMEA', name: 'Inflexion Buyout V Investments LP' };
-const PLAN_TITLE = 'Copilot-Powered Productivity & AI Adoption Program';
 const PROMPTS = CoachMeModalPage.EXPANSION_QUESTIONS;
 
 /** A usable coaching answer is well past this; catches empty/stub responses. */
@@ -52,7 +49,7 @@ const EXPECTED_TOPIC: Record<string, RegExp> = {
   [PROMPTS[3]]: /objection|concern|respon/i,
 };
 
-test.describe(`Expansion Plan Coach Me answers — ${PLAN_TITLE} — ${CUSTOMER.name}`, () => {
+test.describe(`Expansion Plan Coach Me answers — ${CUSTOMER.name}`, () => {
   /*
    * ONE test, ONE browser session: all four prompts run as steps inside a
    * single test. Playwright replaces the worker (and so relaunches the browser)
@@ -74,24 +71,22 @@ test.describe(`Expansion Plan Coach Me answers — ${PLAN_TITLE} — ${CUSTOMER.
       'Credentials must be set (AICoach_MICROSOFT_EMAIL/AICoach_MICROSOFT_PASSWORD or EMAIL/PASSWORD)',
     );
     test.setTimeout(PROMPTS.length * 300000);
-    testInfo.annotations.push({ type: 'expansion plan', description: PLAN_TITLE });
 
     const account = new CustomerAccountPage(page);
     const coach = new CoachMeModalPage(page);
     const httpErrors = watchHttpErrors(page);
+    let planTitle = '';
 
     await test.step('open the plan\'s Coach Me', async () => {
       await account.goto(CUSTOMER.id, CUSTOMER.region);
       await account.openExpansionPlanTab();
-      await expect(account.expansionPlanCards.first()).toBeVisible({ timeout: 30000 });
-      const card = account.expansionPlanCard(PLAN_TITLE);
-      await expect(
-        card,
-        `Expansion plan "${PLAN_TITLE}" is not listed. Plans are AI-generated — update PLAN_TITLE if it was regenerated.`,
-      ).toHaveCount(1);
+      const card = account.expansionPlanCards.first();
+      await expect(card, 'No expansion plans are listed').toBeVisible({ timeout: 30000 });
+      planTitle = (await card.getByRole('heading').first().innerText()).trim();
+      testInfo.annotations.push({ type: 'expansion plan', description: planTitle });
       await card.getByRole('button', { name: 'Coach Me', exact: true }).click();
       await coach.waitForOpen();
-      await expect(coach.title).toHaveText(`Expansion Coach — ${PLAN_TITLE}`);
+      await expect(coach.title).toHaveText(`Expansion Coach — ${planTitle}`);
     });
 
     for (const [index, promptText] of PROMPTS.entries()) {
@@ -110,7 +105,7 @@ test.describe(`Expansion Plan Coach Me answers — ${PLAN_TITLE} — ${CUSTOMER.
         const seconds = Math.round((Date.now() - started) / 1000);
 
         await testInfo.attach(`answer-${index + 1}`, {
-          body: `${PLAN_TITLE}\n\nQ: ${promptText}\n\n${answer}`,
+          body: `${planTitle}\n\nQ: ${promptText}\n\n${answer}`,
           contentType: 'text/plain',
         });
         const mentionsCustomer = /inflexion/i.test(answer);
