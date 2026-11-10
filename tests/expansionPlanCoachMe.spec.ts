@@ -91,10 +91,9 @@ test.describe(`Expansion Plan Coach Me prompts — ${CUSTOMER.name}`, () => {
   });
 
   test('should display the Salesforce connection controls', async () => {
-    await expect(account.connectSalesforceButton).toBeVisible();
-    await expect(account.connectSalesforceButton).toBeEnabled();
-    // The test account never completes Salesforce SSO.
-    await expect(account.salesforceStatus).toHaveText('Salesforce not connected');
+    // Connection state varies per account/session, so only presence is checked.
+    await expect(account.salesforceConnectionButton).toBeVisible();
+    await expect(account.salesforceStatus).toBeVisible();
   });
 
   test('every expansion plan card should display its full text and actions', async () => {

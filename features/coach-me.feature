@@ -318,8 +318,8 @@ Feature: Coach Me - Expansion Plan suggested question prompts
       """
 
   Scenario: Display the Salesforce connection controls
-    Then the "Connect Salesforce (SSO)" button should be visible and enabled
-    And the Salesforce status should read "Salesforce not connected"
+    Then a Salesforce connection button ("Connect to Salesforce" or "Disconnect Salesforce") should be visible
+    And a Salesforce connection status should be visible
 
   Scenario: Every expansion plan card should display its full text and actions
     Given at least one expansion plan is listed

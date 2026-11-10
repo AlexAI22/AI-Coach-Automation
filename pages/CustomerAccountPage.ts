@@ -345,12 +345,16 @@ export class CustomerAccountPage {
     return this.expansionPlanList.locator(':scope > p').first();
   }
 
-  /** "Connect Salesforce (SSO)" button above the expansion plans. */
-  get connectSalesforceButton(): Locator {
-    return this.expansionPlanList.getByRole('button', { name: 'Connect Salesforce (SSO)', exact: true });
+  /**
+   * Salesforce connect/disconnect button above the expansion plans. Its label
+   * depends on the account's connection state ("Connect to Salesforce" or
+   * "Disconnect Salesforce"), so either is accepted.
+   */
+  get salesforceConnectionButton(): Locator {
+    return this.expansionPlanList.getByRole('button', { name: /^(Connect to|Disconnect) Salesforce$/ });
   }
 
-  /** Salesforce connection status pill (e.g. "Salesforce not connected"). */
+  /** Salesforce connection status pill ("Salesforce connected" / "Salesforce not connected"). */
   get salesforceStatus(): Locator {
     return this.expansionPlanList.getByRole('status');
   }
