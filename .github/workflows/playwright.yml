@@ -27,18 +27,21 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # Nightly run at 23:00 Romania time.
+  # Nightly run at ~23:00 Romania time.
   #
   # GitHub cron is ALWAYS UTC and does not follow daylight saving, while Romania
   # does (EET = UTC+2 in winter, EEST = UTC+3 in summer). One fixed expression
   # therefore cannot be 23:00 all year:
   #
-  #   20:00 UTC  ->  23:00 EEST (summer, in effect now)  /  22:00 EET (winter)
+  #   21:07 UTC  ->  23:07 EET (winter, in effect now)  /  00:07 EEST (summer)
   #
-  # Change to '0 21 * * *' at the October clock change to stay on 23:00, and
-  # back to '0 20 * * *' in March.
+  # Change to '7 20 * * *' at the March clock change to stay on 23:07, and
+  # back to '7 21 * * *' in October.
+  #
+  # The minute is deliberately NOT :00. GitHub's scheduler is busiest at the top
+  # of the hour, and the '0 20' slot was observed starting 3-6 hours late.
   schedule:
-    - cron: '0 20 * * *'
+    - cron: '7 21 * * *'
   workflow_dispatch:
     inputs:
       suite:
@@ -54,7 +57,8 @@ concurrency:
 
 jobs:
   test:
-    name: E2E (${{ github.event.inputs.suite || 'smoke' }})
+    # Scheduled runs have no inputs but run the nightly suite, so name them so.
+    name: E2E (${{ github.event.inputs.suite || (github.event_name == 'schedule' && 'nightly') || 'smoke' }})
     runs-on: ubuntu-latest
     # Smoke finishes in ~10 minutes. The cap is sized for the nightly, which
     # adds ~36 real AI runs; it also lowers RETRIES to 1 and passes
@@ -87,6 +91,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Playwright strips types without checking them, so a type error would
+      # otherwise only surface as a runtime failure deep in a long run.
+      - name: Type-check
+        run: npm run typecheck
 
       - name: Install Playwright browser (Chromium)
         run: npx playwright install --with-deps chromium
@@ -129,7 +138,7 @@ jobs:
               npx playwright test
               ;;
             coach-me)
-              echo "COACH ME - all six Coach Me specs"
+              echo "COACH ME - all Coach Me specs (prompts and answers)"
               npm run test:coach-me:everything
               ;;
             answers)

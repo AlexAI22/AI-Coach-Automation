@@ -18,7 +18,7 @@ Model, a single shared browser window, and a reused authentication session.
 | Tool | Purpose |
 |------|---------|
 | `@playwright/test` | Test runner, browser automation, assertions, HTML reporter |
-| `@types/node` (+ `typescript` via `npx`) | Typed test/page-object code (editor + `tsc` type-checking) |
+| `@types/node`, `typescript` | Typed test/page-object code (editor + `npm run typecheck`) |
 | `@playwright/mcp` | Playwright MCP server for AI-assisted authoring (see below) |
 
 The browser, headed/headless mode and action pacing are chosen at runtime through
@@ -113,25 +113,25 @@ Each suite has a plain, a `:headed` and (mostly) a `:secure` variant, e.g.
 | `npm run test:download-response` | `downloadAgentResponse.spec.ts` | "Download response" `.docx` export for every agent chat in a project |
 | `npm run test:personal-digest` | `personal-digest.spec.ts` | Personal Digest → Daily Digest |
 | `npm run test:customer-cvp` | `customer-cvp.spec.ts` | Customer Value Portal list, search, currency, pagination, account detail |
+| `npm run test:ffa-coach-me` | `coachMeFFA.spec.ts` | FFA tab + Coach Me prompts (read-only) |
+| `npm run test:ffa-coach-me-answers` | `coachMeFFAAnswers.spec.ts` | Runs each FFA prompt and checks the AI answer |
 | `npm run test:expansion-coach-me` | `expansionPlanCoachMe.spec.ts` | Expansion Plan tab + Coach Me prompts (read-only) |
 | `npm run test:expansion-coach-me-answers` | `expansionPlanCoachMeAnswers.spec.ts` | Runs each Expansion Plan prompt and checks the AI answer |
 | `npm run test:roadmap-coach-me` | `accountRoadmapCoachMe.spec.ts` | Account Roadmap tab + Coach Me prompts (read-only) |
 | `npm run test:roadmap-coach-me-answers` | `accountRoadmapCoachMeAnswers.spec.ts` | Runs each Account Roadmap prompt and checks the AI answer |
-| `npm run test:coach-me:all` | Opportunities + Expansion + Roadmap prompts | All read-only Coach Me prompt suites |
-| `npm run test:coach-me:answers` | Opportunities + Expansion + Roadmap answers | All Coach Me answer suites |
-| `npm run test:coach-me:everything` | all six of the above | Prompts and answers together |
+| `npm run test:coach-me:all` | Opportunities + FFA + Expansion + Roadmap prompts | All read-only Coach Me prompt suites |
+| `npm run test:coach-me:answers` | Opportunities + FFA + Expansion + Roadmap answers | All Coach Me answer suites |
+| `npm run test:coach-me:everything` | all eight of the above | Prompts and answers together |
 | `npm run report` | | Open the last HTML report |
-
-The **FFA** Coach Me specs have no npm script yet; run them directly:
-
-```bash
-npx playwright test tests/coachMeFFA.spec.ts          # read-only prompts
-npx playwright test tests/coachMeFFAAnswers.spec.ts   # AI answers
-```
+| `npm run typecheck` | | Type-check every spec, page object and support file |
 
 > **Opportunities Coach Me is disabled.** `coachMeOpportunities.spec.ts` and
-> `coachMeOpportunitiesAnswers.spec.ts` are fully commented out, so
-> `test:coach-me` / `test:coach-me-answers` currently run no tests.
+> `coachMeOpportunitiesAnswers.spec.ts` use `test.describe.skip`, so their tests are
+> reported as skipped (and still type-checked). Remove `.skip` to re-enable them.
+
+The Coach Me answer specs share their per-prompt flow and answer checks
+(`MIN_ANSWER_LENGTH`, content-gap/placeholder/topic checks, attachment, clear chat) in
+[tests/support/coachMeAnswers.ts](tests/support/coachMeAnswers.ts).
 
 ### Test categories and cost
 
@@ -177,8 +177,11 @@ chat creation allows up to 8 minutes).
 ### Type-checking
 
 ```bash
-npx -p typescript tsc --noEmit
+npm run typecheck
 ```
+
+Playwright strips TypeScript types without checking them, so CI runs this before the
+tests.
 
 ---
 
@@ -191,7 +194,7 @@ It runs on Ubuntu with bundled **Chromium**, headless, Node 24, single worker, a
 | Trigger | Suite | What runs |
 |---------|-------|-----------|
 | push / PR to `main` | **smoke** | Everything except AI answer suites and mutating tests (~10 min) |
-| nightly, `0 20 * * *` UTC (23:00 Romania summer time) | **nightly** | Everything non-mutating, AI answer suites included (`--max-failures=20`) |
+| nightly, `7 21 * * *` UTC (23:07 Romania winter time) | **nightly** | Everything non-mutating, AI answer suites included (`--max-failures=20`) |
 | manual (`workflow_dispatch`) | choose one | `smoke` \| `answers` \| `nightly` \| `full` \| `coach-me` |
 
 - `answers` runs only the AI answer suites (`--max-failures=10`); `full` runs
@@ -199,6 +202,7 @@ It runs on Ubuntu with bundled **Chromium**, headless, Node 24, single worker, a
   `npm run test:coach-me:everything`.
 - Retries are 2 for smoke/full and 1 for nightly/answers, since a failing AI-answer
   attempt costs minutes.
+- The run type-checks the code (`npm run typecheck`) before installing the browser.
 - The run **fails immediately** if the credential secrets are missing, instead of
   passing with every test skipped.
 - Reporters on CI: `github` (inline annotations), `list` (failures streamed live, so a
@@ -207,8 +211,10 @@ It runs on Ubuntu with bundled **Chromium**, headless, Node 24, single worker, a
   kept 14 days), even on timeout.
 - Only one run per ref at a time; a newer push cancels the older run.
 
-GitHub cron is always UTC. Switch the schedule to `0 21 * * *` at the October clock
-change to stay on 23:00 Romania time, and back to `0 20 * * *` in March.
+GitHub cron is always UTC. Switch the schedule to `7 20 * * *` at the March clock
+change to stay on 23:07 Romania time, and back to `7 21 * * *` in October. The minute
+is deliberately not `:00`: GitHub's scheduler is busiest at the top of the hour, and
+the old `0 20` slot started 3-6 hours late.
 
 ### Required repository secrets
 
@@ -248,10 +254,11 @@ credentials are never stored in the repository.
 │   ├── expansionPlanCoachMeAnswers.spec.ts
 │   ├── accountRoadmapCoachMe.spec.ts   # Account Roadmap Coach Me prompts (read-only)
 │   ├── accountRoadmapCoachMeAnswers.spec.ts
-│   ├── coachMeOpportunities*.spec.ts   # Opportunities Coach Me (currently disabled)
+│   ├── coachMeOpportunities*.spec.ts   # Opportunities Coach Me (currently skipped)
 │   ├── fixtures/transcript.txt         # Upload for the Upsell & Cross Sell agent
 │   └── support/
 │       ├── fixtures.ts                 # ONE browser/window for the whole run, shared `page`, `anonPage`
+│       ├── coachMeAnswers.ts           # Shared ask-and-check flow for the Coach Me answer specs
 │       └── httpErrors.ts               # watchHttpErrors(): fail on app 4xx/5xx responses
 ├── support/
 │   ├── credentials.ts                  # Credentials read from the environment
@@ -366,4 +373,4 @@ On CI, download the `playwright-report-<run_id>` artifact from the workflow run.
 | A second browser window appears mid-run | Playwright discards the worker after a test failure and reopens the window; the login-form specs also use their own logged-out window. |
 | Headed Chrome window is black | GPU/occlusion issue on Windows; the config's launch flags handle it. Make sure you haven't added `--disable-software-rasterizer`. |
 | Run is too slow to watch / too slow overall | Tune `SLOWMO` (e.g. `SLOWMO=0`), or run `HEADLESS=true`. |
-| `test:coach-me` runs 0 tests | The Opportunities Coach Me specs are commented out (disabled). |
+| `test:coach-me` reports every test as skipped | The Opportunities Coach Me specs are disabled with `test.describe.skip`. |

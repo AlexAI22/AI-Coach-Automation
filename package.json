@@ -24,10 +24,13 @@
     "test:coach-me": "playwright test tests/coachMeOpportunities.spec.ts",
     "test:coach-me:headed": "playwright test tests/coachMeOpportunities.spec.ts --headed",
     "test:coach-me:secure": "pwsh -NoProfile -File scripts/run-secure.ps1 -Spec tests/coachMeOpportunities.spec.ts",
-    "test:coach-me:all": "playwright test tests/coachMeOpportunities.spec.ts tests/expansionPlanCoachMe.spec.ts tests/accountRoadmapCoachMe.spec.ts",
-    "test:coach-me:all:headed": "playwright test tests/coachMeOpportunities.spec.ts tests/expansionPlanCoachMe.spec.ts tests/accountRoadmapCoachMe.spec.ts --headed",
-    "test:coach-me:everything": "playwright test tests/coachMeOpportunities.spec.ts tests/expansionPlanCoachMe.spec.ts tests/accountRoadmapCoachMe.spec.ts tests/coachMeOpportunitiesAnswers.spec.ts tests/expansionPlanCoachMeAnswers.spec.ts tests/accountRoadmapCoachMeAnswers.spec.ts",
-    "test:coach-me:answers": "playwright test tests/coachMeOpportunitiesAnswers.spec.ts tests/expansionPlanCoachMeAnswers.spec.ts tests/accountRoadmapCoachMeAnswers.spec.ts",
+    "test:coach-me:all": "playwright test tests/coachMeOpportunities.spec.ts tests/coachMeFFA.spec.ts tests/expansionPlanCoachMe.spec.ts tests/accountRoadmapCoachMe.spec.ts",
+    "test:coach-me:all:headed": "playwright test tests/coachMeOpportunities.spec.ts tests/coachMeFFA.spec.ts tests/expansionPlanCoachMe.spec.ts tests/accountRoadmapCoachMe.spec.ts --headed",
+    "test:coach-me:everything": "playwright test tests/coachMeOpportunities.spec.ts tests/coachMeFFA.spec.ts tests/expansionPlanCoachMe.spec.ts tests/accountRoadmapCoachMe.spec.ts tests/coachMeOpportunitiesAnswers.spec.ts tests/coachMeFFAAnswers.spec.ts tests/expansionPlanCoachMeAnswers.spec.ts tests/accountRoadmapCoachMeAnswers.spec.ts",
+    "test:coach-me:answers": "playwright test tests/coachMeOpportunitiesAnswers.spec.ts tests/coachMeFFAAnswers.spec.ts tests/expansionPlanCoachMeAnswers.spec.ts tests/accountRoadmapCoachMeAnswers.spec.ts",
+    "test:ffa-coach-me": "playwright test tests/coachMeFFA.spec.ts",
+    "test:ffa-coach-me:headed": "playwright test tests/coachMeFFA.spec.ts --headed",
+    "test:ffa-coach-me:secure": "pwsh -NoProfile -File scripts/run-secure.ps1 -Spec tests/coachMeFFA.spec.ts",
     "test:roadmap-coach-me-answers": "playwright test tests/accountRoadmapCoachMeAnswers.spec.ts",
     "test:roadmap-coach-me-answers:headed": "playwright test tests/accountRoadmapCoachMeAnswers.spec.ts --headed",
     "test:roadmap-coach-me-answers:secure": "pwsh -NoProfile -File scripts/run-secure.ps1 -Spec tests/accountRoadmapCoachMeAnswers.spec.ts",
@@ -47,15 +50,17 @@
     "test:ffa-coach-me-answers:headed": "playwright test tests/coachMeFFAAnswers.spec.ts --headed",
     "test:ffa-coach-me-answers:secure": "pwsh -NoProfile -File scripts/run-secure.ps1 -Spec tests/coachMeFFAAnswers.spec.ts",
     "test:secure": "pwsh -NoProfile -File scripts/run-secure.ps1",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit -p ."
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "@playwright/mcp": "^0.0.75",
-    "@playwright/test": "^1.60.0",
-    "@types/node": "^25.7.0"
+    "@playwright/mcp": "^0.0.85",
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2"
   }
 }
