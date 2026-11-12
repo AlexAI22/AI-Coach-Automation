@@ -27,11 +27,20 @@ const NO_MATCH_QUERY = 'zzzz-no-such-customer-zzzz';
  * set, which makes them the likeliest to fail on CI while passing locally.
  * Say so in the failure rather than leaving a bare "expected 1, received 0".
  */
+/**
+ * How long a real-customer search may take to answer. MEASURED against staging
+ * (Nov 2026), same query, four fresh page loads: 3s, 22s, 10s, 25s. The default
+ * 20s expect timeout sat inside that spread, which is why the first search in
+ * "should filter out non-matching customers" flaked and passed on retry.
+ */
+const SEARCH_TIMEOUT = 60000;
+
 const SEARCH_DATA_HINT =
-  `Expected exactly one row for query "${SEARCH_CUSTOMER.query}". Search runs against the ` +
-  `REAL customers the logged-in account can see, so a count of 0 most likely means this ` +
-  `account cannot see customer ${SEARCH_CUSTOMER.name} (${SEARCH_CUSTOMER.id}) - on CI, ` +
-  `check that the AICOACH_EMAIL secret is the same staging account used locally.`;
+  `Expected exactly one row for query "${SEARCH_CUSTOMER.query}" within ${SEARCH_TIMEOUT / 1000}s. ` +
+  `Search runs against the REAL customers the logged-in account can see, so a count of 0 ` +
+  `means either the search endpoint was slower than usual or this account cannot see ` +
+  `customer ${SEARCH_CUSTOMER.name} (${SEARCH_CUSTOMER.id}) - on CI, check that the ` +
+  `AICOACH_EMAIL secret is the same staging account used locally.`;
 
 test.describe('Customer Value Portal (reused session)', () => {
   test.describe.configure({ mode: 'default' });
@@ -137,11 +146,13 @@ test.describe('Customer Value Portal (reused session)', () => {
      * knows nothing about, so the sample rows never react.
      */
     test('should filter out non-matching customers via search', async () => {
+      // Three real searches, each of which can take up to SEARCH_TIMEOUT.
+      test.setTimeout(240000);
       await cvp.ensureDemoModeOff();
 
       // A matching query puts exactly the one real customer on screen...
       await cvp.search(SEARCH_CUSTOMER.query);
-      await expect(cvp.rows, SEARCH_DATA_HINT).toHaveCount(1);
+      await expect(cvp.rows, SEARCH_DATA_HINT).toHaveCount(1, { timeout: SEARCH_TIMEOUT });
 
       // ...and a query that matches nothing empties the list FOR REAL. Rows AND
       // skeletons both have to be gone: the placeholders are the loading state,
@@ -149,14 +160,14 @@ test.describe('Customer Value Portal (reused session)', () => {
       // merely still in flight, which is how this test used to pass while search
       // was being pointed at the wrong data set entirely.
       await cvp.search(NO_MATCH_QUERY);
-      await expect(cvp.showingLabel).toContainText(/Showing 0 of 0/);
+      await expect(cvp.showingLabel).toContainText(/Showing 0 of 0/, { timeout: SEARCH_TIMEOUT });
       await expect(cvp.rows).toHaveCount(0);
       await expect(cvp.skeletonRows).toHaveCount(0);
 
       // Searching again brings the match back, proving the empty result was the
       // query doing its job rather than a list that had stopped loading.
       await cvp.search(SEARCH_CUSTOMER.query);
-      await expect(cvp.rows, SEARCH_DATA_HINT).toHaveCount(1);
+      await expect(cvp.rows, SEARCH_DATA_HINT).toHaveCount(1, { timeout: SEARCH_TIMEOUT });
     });
 
     /**
@@ -184,7 +195,7 @@ test.describe('Customer Value Portal (reused session)', () => {
       await cvp.search(SEARCH_CUSTOMER.query);
 
       // Exactly the searched-for customer, and nothing besides it.
-      await expect(cvp.rows, SEARCH_DATA_HINT).toHaveCount(1);
+      await expect(cvp.rows, SEARCH_DATA_HINT).toHaveCount(1, { timeout: SEARCH_TIMEOUT });
       await expect(cvp.nameOf(cvp.rows.first())).toHaveText(SEARCH_CUSTOMER.name);
       await expect(cvp.rows.first()).toContainText('Customer ID: ' + SEARCH_CUSTOMER.id);
       await expect(cvp.showingLabel).toContainText(/Showing 1 of 1/);

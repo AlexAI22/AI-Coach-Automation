@@ -124,18 +124,19 @@ test.describe('Personal Digest — Daily Digest (reused session)', () => {
     await expect(digest.newsSection).toBeVisible();
   });
 
-  test('should refresh the digest without HTTP errors', async ({ page }) => {
-    test.setTimeout(220000); // regenerating the digest can take a while
+  // @ai: Refresh regenerates the digest server-side (~3 min on staging), so it
+  // stays out of the per-push smoke and runs in the nightly suite.
+  test('should refresh the digest without HTTP errors', { tag: '@ai' }, async ({ page }) => {
+    test.setTimeout(360000); // the regeneration alone takes ~186s on staging
     const httpErrors = watchHttpErrors(page);
 
     await digest.dismissWelcomeDialog();
+    await expect(digest.refreshButton).toHaveText('Refresh Digest');
     await expect(digest.refreshButton).toBeEnabled();
-    await digest.refreshButton.click();
 
-    // The button disables while the digest regenerates (best-effort), then
-    // becomes enabled again when it completes.
-    await expect(digest.refreshButton).toBeDisabled({ timeout: 10000 }).catch(() => {});
-    await expect(digest.refreshButton).toBeEnabled({ timeout: 180000 });
+    // Clicks, waits for the refresh_news request to answer, and checks the
+    // button returns to "Refresh Digest" (enabled).
+    await digest.refreshDigest();
 
     // Content is still present after the refresh.
     await expect(digest.newsSection).toBeVisible();

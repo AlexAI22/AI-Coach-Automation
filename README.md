@@ -125,9 +125,9 @@ Each suite has a plain, a `:headed` and (mostly) a `:secure` variant, e.g.
 | `npm run report` | | Open the last HTML report |
 | `npm run typecheck` | | Type-check every spec, page object and support file |
 
-> **Opportunities Coach Me is disabled.** `coachMeOpportunities.spec.ts` and
-> `coachMeOpportunitiesAnswers.spec.ts` use `test.describe.skip`, so their tests are
-> reported as skipped (and still type-checked). Remove `.skip` to re-enable them.
+> **Opportunities Coach Me answers are opt-in.** `coachMeOpportunities.spec.ts` (prompts,
+> read-only) runs by default. `coachMeOpportunitiesAnswers.spec.ts` (8 real AI runs) is
+> skipped unless `RUN_OPPORTUNITIES` is set — run it with `npm run test:opportunities:answers`.
 
 The Coach Me answer specs share their per-prompt flow and answer checks
 (`MIN_ANSWER_LENGTH`, content-gap/placeholder/topic checks, attachment, clear chat) in
@@ -291,7 +291,7 @@ credentials are never stored in the repository.
 │   ├── expansionPlanCoachMeAnswers.spec.ts
 │   ├── accountRoadmapCoachMe.spec.ts   # Account Roadmap Coach Me prompts (read-only)
 │   ├── accountRoadmapCoachMeAnswers.spec.ts
-│   ├── coachMeOpportunities*.spec.ts   # Opportunities Coach Me (currently skipped)
+│   ├── coachMeOpportunities*.spec.ts   # Opportunities Coach Me (answers gated behind RUN_OPPORTUNITIES)
 │   ├── fixtures/transcript.txt         # Upload for the Upsell & Cross Sell agent
 │   └── support/
 │       ├── fixtures.ts                 # ONE browser/window for the whole run, shared `page`, `anonPage`
@@ -410,4 +410,4 @@ On CI, download the `playwright-report-<run_id>` artifact from the workflow run.
 | A second browser window appears mid-run | Playwright discards the worker after a test failure and reopens the window; the login-form specs also use their own logged-out window. |
 | Headed Chrome window is black | GPU/occlusion issue on Windows; the config's launch flags handle it. Make sure you haven't added `--disable-software-rasterizer`. |
 | Run is too slow to watch / too slow overall | Tune `SLOWMO` (e.g. `SLOWMO=0`), or run `HEADLESS=true`. |
-| `test:coach-me` reports every test as skipped | The Opportunities Coach Me specs are disabled with `test.describe.skip`. |
+| `coachMeOpportunitiesAnswers.spec.ts` reports every test as skipped | It is gated behind `RUN_OPPORTUNITIES`; use `npm run test:opportunities:answers`. |

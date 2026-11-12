@@ -28,10 +28,10 @@ const EXPECTED_PROMPTS = CoachMeModalPage.SUGGESTED_QUESTIONS;
 // in the first test — re-opening it per test would mean re-navigating to the
 // account page (which needs several reloads on staging) seven more times.
 //
-// DISABLED by default on request; opt in with `npm run test:opportunities`
-// (sets RUN_OPPORTUNITIES=1).
+// Runs by default again (re-verified Nov 2026: all 16 pass against staging in
+// ~12s). Only the AI-answers counterpart, coachMeOpportunitiesAnswers.spec.ts,
+// is still gated behind RUN_OPPORTUNITIES.
 test.describe(`Coach Me prompts — ${CUSTOMER.name} / ${OPPORTUNITY}`, () => {
-  test.skip(!process.env.RUN_OPPORTUNITIES, 'Disabled by default; run with npm run test:opportunities');
   test.describe.configure({ mode: 'serial' });
 
   let account: CustomerAccountPage;

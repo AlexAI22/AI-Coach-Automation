@@ -14,8 +14,8 @@
 #   Account Roadmap answers  tests/accountRoadmapCoachMeAnswers.spec.ts      1        8
 #                                                                  total    63       20
 #
-#   @disabled  Opportunities prompts  tests/coachMeOpportunities.spec.ts        (commented out)
-#   @disabled  Opportunities answers  tests/coachMeOpportunitiesAnswers.spec.ts (commented out)
+#   Opportunities prompts            tests/coachMeOpportunities.spec.ts        (runs by default)
+#   @disabled  Opportunities answers  tests/coachMeOpportunitiesAnswers.spec.ts (opt-in: RUN_OPPORTUNITIES=1)
 #
 # The "prompts" features check TEXT ONLY and click no prompt, so they trigger
 # no AI run. The "answers" features trigger real AI runs, which is why they are
@@ -24,13 +24,13 @@
 # replaces the worker - and relaunches the browser - after every failed test,
 # so one-test-per-prompt reopened the browser whenever a prompt failed.
 #
-# The two Opportunities suites are commented out on request (Oct 2026); their
-# scenarios are kept below, tagged @disabled, for when they are re-enabled.
+# The Opportunities prompts suite was re-enabled in Nov 2026 (all 16 cases pass
+# against staging). The Opportunities answers suite stays opt-in behind
+# RUN_OPPORTUNITIES (npm run test:opportunities:answers).
 # The FFA tab moved within the account tab strip (Oct 2026); the specs select
 # it by name, so its position does not matter.
-# NOTE: the npm scripts test:coach-me, test:coach-me:all, :answers and
-# :everything still point at the disabled Opportunities specs and do NOT include
-# the FFA specs - run the FFA specs by path.
+# NOTE: the npm scripts test:coach-me:answers and :everything include the
+# Opportunities answers spec, which skips unless RUN_OPPORTUNITIES is set.
 #
 # ----------------------------------------------------------------------------
 # Preconditions shared by EVERY scenario
@@ -633,18 +633,16 @@ Feature: Coach Me - Account Roadmap answers
 
 
 # ============================================================================
-# DISABLED SUITES — tests/coachMeOpportunities.spec.ts and
-# tests/coachMeOpportunitiesAnswers.spec.ts are commented out on request
-# (Oct 2026). The scenarios are kept as documentation of what they cover when
-# uncommented. They still target the Demo Mode customer
+# OPPORTUNITIES SUITES — tests/coachMeOpportunities.spec.ts runs by default
+# (re-enabled Nov 2026); tests/coachMeOpportunitiesAnswers.spec.ts is opt-in
+# behind RUN_OPPORTUNITIES. They still target the Demo Mode customer
 # "Ballyvesey Industries Ltd" (GGP ID 0009626222) and the "Opportunities" tab;
 # the same modal and prompt set is now covered through the FFA tab above.
 # ============================================================================
 
 # ----------------------------------------------------------------------------
-# tests/coachMeOpportunities.spec.ts — DISABLED (16 cases when enabled).
+# tests/coachMeOpportunities.spec.ts — 16 cases, runs by default.
 # ----------------------------------------------------------------------------
-@disabled
 Feature: Coach Me - Opportunities suggested question prompts
   As an authenticated AI Coach user
   I want the AI Coach modal to offer a fixed set of coaching questions for an opportunity
@@ -716,7 +714,7 @@ Feature: Coach Me - Opportunities suggested question prompts
 
 
 # ----------------------------------------------------------------------------
-# tests/coachMeOpportunitiesAnswers.spec.ts — DISABLED (8 cases / 8 AI runs when enabled).
+# tests/coachMeOpportunitiesAnswers.spec.ts — OPT-IN via RUN_OPPORTUNITIES (8 cases / 8 AI runs).
 # ----------------------------------------------------------------------------
 @disabled
 Feature: Coach Me - Opportunities answers

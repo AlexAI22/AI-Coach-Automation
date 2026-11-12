@@ -64,12 +64,13 @@ Feature: Personal Digest - Daily Digest
     Then the page URL should match "/personal-digest/daily-digest"
     And the Featured News section should be visible
 
-  @slow
+  @slow @ai
   Scenario: Refresh the digest without HTTP errors
     Given I dismiss the "Welcome to AI Coach" modal if it is shown
     And the "Refresh Digest" button is enabled
     When I click "Refresh Digest"
-    Then the digest should regenerate and the button becomes enabled again
+    Then the button should read "Refreshing…" and be disabled while the digest regenerates
+    And the digest should regenerate (about 3 minutes on staging) and the button reads "Refresh Digest" and is enabled again
     And the Featured News section should still be visible with at least one item
     And no HTTP 4xx or 5xx errors should have occurred during the refresh
 
