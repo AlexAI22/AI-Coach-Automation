@@ -36,7 +36,8 @@ const EXPECTED_TOPIC: Record<string, RegExp> = {
   [PROMPTS[7]]: /push ?back|objection|concern|acknowledge/i,
 };
 
-test.describe(`Account Roadmap Coach answers — ${CUSTOMER.name}`, () => {
+// @ai: triggers real AI runs, so CI keeps it out of the per-push smoke.
+test.describe(`Account Roadmap Coach answers — ${CUSTOMER.name}`, { tag: '@ai' }, () => {
   test('every suggested question should return a usable answer', async ({ sharedPage: page }, testInfo) => {
     test.skip(!hasCredentials(), CREDENTIALS_REQUIRED);
     test.setTimeout(PROMPTS.length * 300000);

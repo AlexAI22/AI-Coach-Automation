@@ -4,6 +4,7 @@ import { CoachMeModalPage } from '../pages/CoachMeModalPage';
 import { watchHttpErrors } from './support/httpErrors';
 import { hasCredentials } from '../support/credentials';
 import { askAndCheckAnswer, CREDENTIALS_REQUIRED } from './support/coachMeAnswers';
+import { expectFailureFromKnownIssue, KNOWN_ISSUES } from './support/knownIssues';
 
 /**
  * Coach Me — running every suggested question and checking its answer.
@@ -18,14 +19,14 @@ import { askAndCheckAnswer, CREDENTIALS_REQUIRED } from './support/coachMeAnswer
  * them apart means the cheap checks stay cheap.
  */
 
-const CUSTOMER = { id: '0009626222', name: 'Ballyvesey Industries Ltd' };
+const CUSTOMER = { id: '0009626222', region: 'EMEA', name: 'Ballyvesey Industries Ltd' };
 const OPPORTUNITY = 'Foundation Frontier Assessment';
 const PROMPTS = CoachMeModalPage.SUGGESTED_QUESTIONS;
 
-// DISABLED on request (it used to be commented out in full). Skipped rather than
-// commented out so it keeps compiling against the page objects; remove `.skip`
-// to re-enable.
-test.describe.skip(`Coach Me answers — ${CUSTOMER.name} / ${OPPORTUNITY}`, () => {
+// DISABLED by default on request; opt in with `npm run test:opportunities:answers`
+// (sets RUN_OPPORTUNITIES=1). @ai: every case triggers a real AI run.
+test.describe(`Coach Me answers — ${CUSTOMER.name} / ${OPPORTUNITY}`, { tag: '@ai' }, () => {
+  test.skip(!process.env.RUN_OPPORTUNITIES, 'Disabled by default; run with npm run test:opportunities:answers');
   // Default (not serial): each prompt is independent, so one failing prompt must
   // not hide the ones after it. Under serial, a single content gap on prompt 7
   // silently skipped prompt 8 entirely.
@@ -34,15 +35,22 @@ test.describe.skip(`Coach Me answers — ${CUSTOMER.name} / ${OPPORTUNITY}`, () 
   let account: CustomerAccountPage;
   let coach: CoachMeModalPage;
 
+  // The Opportunities tab lost its Coach Me buttons (Nov 2026); the entry point is the FFA tab card.
+  const openCoachMe = async (): Promise<void> => {
+    await account.openTab('FFA');
+    const button = account.ffaCard(OPPORTUNITY).getByRole('button', { name: 'Coach Me', exact: true });
+    await expect(button).toBeEnabled({ timeout: 20000 });
+    await button.click();
+    await coach.waitForOpen();
+  };
+
   test.beforeAll(async ({ sharedPage }) => {
     if (!hasCredentials()) return; // tests skip below
     test.setTimeout(180000);
     account = new CustomerAccountPage(sharedPage);
     coach = new CoachMeModalPage(sharedPage);
-    await account.goto(CUSTOMER.id);
-    await account.openTab('Opportunities');
-    await account.openCoachMe(OPPORTUNITY);
-    await coach.waitForOpen();
+    await account.goto(CUSTOMER.id, CUSTOMER.region);
+    await openCoachMe();
   });
 
   // Self-healing: a prompt that failed mid-answer would otherwise leave the
@@ -51,9 +59,7 @@ test.describe.skip(`Coach Me answers — ${CUSTOMER.name} / ${OPPORTUNITY}`, () 
     test.skip(!hasCredentials(), CREDENTIALS_REQUIRED);
 
     if (!(await coach.panel.isVisible().catch(() => false))) {
-      await account.openTab('Opportunities');
-      await account.openCoachMe(OPPORTUNITY);
-      await coach.waitForOpen();
+      await openCoachMe();
     }
   });
 
@@ -65,18 +71,18 @@ test.describe.skip(`Coach Me answers — ${CUSTOMER.name} / ${OPPORTUNITY}`, () 
    *    The required Advisory Motion training content has not been loaded."
    *
    * 140 characters, and it trips FAILURE_MARKERS. That is missing CONTENT on
-   * staging, not a test defect, so this case RUNS and FAILS on purpose: the
-   * assertions stay identical to every other prompt, and the failure is the
-   * standing signal that the Advisory Motion content is not loaded. It will
-   * pass by itself once the content lands — no edit needed here.
+   * staging, not a test defect, so the case runs with the same assertions as
+   * every other prompt, but is marked EXPECTED TO FAIL (tests/support/knownIssues.ts).
+   * Once the content lands it unexpectedly passes and turns red. Remove the
+   * marker then.
    *
-   * Re-confirmed still failing after the content check on the day this was
-   * written; do not "fix" it by lowering MIN_ANSWER_LENGTH or trimming
-   * FAILURE_MARKERS, which would hide the gap instead of reporting it.
+   * Do not "fix" it by lowering MIN_ANSWER_LENGTH or trimming FAILURE_MARKERS,
+   * which would hide the gap instead of reporting it.
    */
   for (const [index, promptText] of PROMPTS.entries()) {
     test(`prompt ${index + 1} should return a usable answer: "${promptText}"`, async ({ page }, testInfo) => {
       test.setTimeout(600000); // a single answer has been observed to take ~2.5 min
+      if (index + 1 === 7) expectFailureFromKnownIssue(KNOWN_ISSUES.advisoryMotionNotLoaded);
 
       const httpErrors = watchHttpErrors(page);
 

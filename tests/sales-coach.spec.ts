@@ -165,11 +165,12 @@ test.describe('Sales Coach (reused session)', () => {
   ];
 
   // NOTE: these are MUTATING tests — each creates a real chat (and triggers a
-  // full AI run, ~1-2 min) in the "Automation Project".
+  // full AI run, ~1-2 min) in the "Automation Project". The @mutating tag keeps
+  // them out of every automatic CI run; only the manual "full" suite runs them.
   for (const agent of [...agents, ...legacyAgents]) {
-    test(`should create a ${agent.name} chat and find it in the Automation Project folder`, async ({
-      page,
-    }) => {
+    test(`should create a ${agent.name} chat and find it in the Automation Project folder`, {
+      tag: '@mutating',
+    }, async ({ page }) => {
       test.setTimeout(480000); // some agent runs (e.g. Upsell & Cross Sell) take several minutes
 
       // Fail the test if the app returns ANY HTTP 4xx/5xx during the flow.

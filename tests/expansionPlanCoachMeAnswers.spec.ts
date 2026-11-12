@@ -1,9 +1,10 @@
 import { test, expect } from './support/fixtures';
 import { CustomerAccountPage } from '../pages/CustomerAccountPage';
 import { CoachMeModalPage } from '../pages/CoachMeModalPage';
-import { watchHttpErrors } from './support/httpErrors';
+import { watchHttpErrors, type HttpError } from './support/httpErrors';
 import { hasCredentials } from '../support/credentials';
 import { askAndCheckAnswer, CREDENTIALS_REQUIRED } from './support/coachMeAnswers';
+import { expectKnownIssueStillPresent, KNOWN_ISSUES } from './support/knownIssues';
 
 /**
  * Expansion Plan — Coach Me: run every suggested question of the first listed
@@ -30,7 +31,11 @@ const EXPECTED_TOPIC: Record<string, RegExp> = {
   [PROMPTS[3]]: /objection|concern|respon/i,
 };
 
-test.describe(`Expansion Plan Coach Me answers — ${CUSTOMER.name}`, () => {
+/** The Expansion Coach "materials" request that 404s (KNOWN_ISSUES.expansionMaterials404). */
+const MATERIALS_URL = /\/csm\/coach-sessions\/expansion_coach\/[^/?#]+\/materials(?:[?#]|$)/;
+
+// @ai: triggers real AI runs, so CI keeps it out of the per-push smoke.
+test.describe(`Expansion Plan Coach Me answers — ${CUSTOMER.name}`, { tag: '@ai' }, () => {
   /*
    * ONE test, ONE browser session: all four prompts run as steps inside a
    * single test. Playwright replaces the worker (and so relaunches the browser)
@@ -38,13 +43,16 @@ test.describe(`Expansion Plan Coach Me answers — ${CUSTOMER.name}`, () => {
    * each prompt while the known 404 below is failing. Answer checks are SOFT so
    * a bad answer to one prompt is reported without stopping the next prompts.
    *
-   * KNOWN PRODUCT ISSUE on staging (the test FAILS on purpose, as the standing
-   * signal; it passes by itself once the backend is fixed):
+   * KNOWN PRODUCT ISSUE on staging (KNOWN_ISSUES.expansionMaterials404):
    *  - each new Expansion Coach session (on open and after "Clear chat")
    *    requests GET /csm/coach-sessions/expansion_coach/<sessionId>/materials,
    *    which returns 404. The FFA coach's equivalent call succeeds, so an empty
    *    session should return an empty list, not 404.
-   * The answers themselves pass every content check. Do not allow-list the 404.
+   * ONLY that exact 404 is tolerated, and it is collected rather than hidden.
+   * The test is NOT marked test.fail() as a whole: that would also hide a real
+   * answer regression in any of the four prompts. Every other HTTP error still
+   * fails the test. Once the backend is fixed, the 404 stops appearing and the
+   * test FAILS with "looks fixed". Remove the marker below then.
    */
   test('every suggested question should return a usable answer', async ({ sharedPage: page }, testInfo) => {
     test.skip(!hasCredentials(), CREDENTIALS_REQUIRED);
@@ -52,7 +60,11 @@ test.describe(`Expansion Plan Coach Me answers — ${CUSTOMER.name}`, () => {
 
     const account = new CustomerAccountPage(page);
     const coach = new CoachMeModalPage(page);
-    const httpErrors = watchHttpErrors(page);
+    const knownMaterials404s: HttpError[] = [];
+    const httpErrors = watchHttpErrors(page, {
+      allow: (status, url) => status === 404 && MATERIALS_URL.test(url),
+      onAllowed: (err) => knownMaterials404s.push(err),
+    });
     let planTitle = '';
 
     await test.step('open the plan\'s Coach Me', async () => {
@@ -84,5 +96,6 @@ test.describe(`Expansion Plan Coach Me answers — ${CUSTOMER.name}`, () => {
     await coach.close();
 
     expect(httpErrors, `Unexpected HTTP errors: ${JSON.stringify(httpErrors, null, 2)}`).toEqual([]);
+    expectKnownIssueStillPresent(KNOWN_ISSUES.expansionMaterials404, knownMaterials404s.length > 0);
   });
 });

@@ -280,9 +280,10 @@ Feature: Coach Me - FFA answers
   # Notes:
   #  - Runs in default (not serial) mode so one failing prompt cannot skip the
   #    prompts after it; the setup reopens the modal if a failed case closed it.
-  #  - KNOWN PRODUCT ISSUES on staging. These cases FAIL ON PURPOSE as the
-  #    standing signal and pass by themselves once the content is fixed - do
-  #    NOT loosen the checks to make them pass:
+  #  - KNOWN PRODUCT ISSUES on staging. These cases are marked EXPECTED TO FAIL
+  #    (tests/support/knownIssues.ts), so they keep the run green and are not
+  #    retried. Once the content is fixed they pass unexpectedly and turn red,
+  #    and the marker is removed then. Do NOT loosen the checks to make them pass:
   #      prompt 1  the Service Catalogue entry is not loaded, so no outcomes or
   #                deliverables are listed (soft content-gap check)
   #      prompt 7  "Advisory Motion training content has not been loaded"
@@ -441,12 +442,14 @@ Feature: Coach Me - Expansion Plan answers
   #    plan, and the prompt text of all plans is covered by the prompts spec.
   #    If the plan is regenerated under a new name the case fails with a message
   #    saying to update PLAN_TITLE.
-  #  - KNOWN PRODUCT ISSUE on staging - the case FAILS ON PURPOSE on the HTTP
-  #    error check: each new Expansion Coach session (on open and after "Clear
-  #    chat") requests GET /csm/coach-sessions/expansion_coach/<sessionId>/materials,
-  #    which returns 404. The FFA coach's equivalent call succeeds, so an empty
-  #    session should return an empty list, not 404. The answers themselves pass
-  #    every content check. Do NOT allow-list the 404.
+  #  - KNOWN PRODUCT ISSUE on staging: each new Expansion Coach session (on open
+  #    and after "Clear chat") requests
+  #    GET /csm/coach-sessions/expansion_coach/<sessionId>/materials, which
+  #    returns 404. The FFA coach's equivalent call succeeds, so an empty session
+  #    should return an empty list, not 404. ONLY that exact 404 is tolerated and
+  #    recorded as a "known issue" annotation; any other HTTP error and every
+  #    answer check still fail the case. Once the 404 stops appearing, the case
+  #    fails with "looks fixed" and the marker is removed.
 
 
 # ----------------------------------------------------------------------------

@@ -6,7 +6,7 @@ import { CUSTOMER_ACCOUNT_PATH, CUSTOMER_VALUE_PORTAL_PATH } from '../support/ro
  *
  * Layout: a title/description header, a "Demo Mode" toggle and a currency
  * <select> (GBP/USD/EUR), a "Search customers by name" box, a customer table
- * (Customer / Channel / MS L12M Licensing Revenue / MS L12M ACR /
+ * (Customer / Channel / Success Motion / MS L12M Licensing Revenue / MS L12M ACR /
  * L12M Invoiced Total / Account Team columns) and pagination controls with a
  * "Showing X of Y customers" label.
  *
@@ -156,9 +156,15 @@ export class CustomerValuePortalPage {
     // placeholders are ALSO the empty state when there are no customers, so
     // skipping the toggle while they are on screen means Demo Mode never gets
     // enabled and the list can never populate.
-    for (let attempt = 0; attempt < 5; attempt++) {
+    // locator.isVisible() ignores its timeout, so the waits below use waitFor().
+    const rowsVisibleWithin = (timeout: number): Promise<boolean> =>
+      this.rows.first().waitFor({ state: 'visible', timeout }).then(() => true, () => false);
+
+    // Three attempts: now that each one really waits, five would outlast the
+    // 120s test timeout.
+    for (let attempt = 0; attempt < 3; attempt++) {
       // Cheap check first: the rows are frequently already there.
-      if (await this.rows.first().isVisible({ timeout: 1000 }).catch(() => false)) {
+      if (await rowsVisibleWithin(1000)) {
         return;
       }
 
@@ -175,7 +181,7 @@ export class CustomerValuePortalPage {
 
       // MEASURED: rows land ~6-8s after Demo Mode is enabled. The old 8s wait
       // sat exactly on that boundary, so a slower runner tipped it into failure.
-      if (await this.rows.first().isVisible({ timeout: 25000 }).catch(() => false)) {
+      if (await rowsVisibleWithin(25000)) {
         return;
       }
     }
@@ -234,14 +240,14 @@ export class CustomerValuePortalPage {
   }
 
   /**
-   * The first monetary cell within a given row. Each row is a six-column grid
-   * (Customer, Channel, MS L12M Licensing Revenue, MS L12M ACR,
-   * L12M Invoiced Total, Account Team), so the third cell is the MS L12M
+   * The first monetary cell within a given row. Each row is a seven-column grid
+   * (Customer, Channel, Success Motion, MS L12M Licensing Revenue, MS L12M ACR,
+   * L12M Invoiced Total, Account Team), so the fourth cell is the MS L12M
    * Licensing Revenue value. The money cells are spans rather than divs, so
    * the columns are counted across every child tag.
    */
   revenueCellOf(row: Locator): Locator {
-    return row.locator(':scope > *').nth(2);
+    return row.locator(':scope > *').nth(3);
   }
 
   /** Trimmed name text of the first customer row (waits for it to render). */

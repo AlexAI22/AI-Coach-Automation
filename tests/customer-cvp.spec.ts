@@ -71,6 +71,7 @@ test.describe('Customer Value Portal (reused session)', () => {
     for (const col of [
       'Customer',
       'Channel',
+      'Success Motion',
       'MS L12M Licensing Revenue',
       'MS L12M ACR',
       'L12M Invoiced Total',
@@ -249,7 +250,8 @@ test.describe('Customer Value Portal — Account navigation (reused session)', (
   test('should open the account page when a customer row is clicked', async ({ page }) => {
     const name = await cvp.openCustomer(0);
     await expect(page).toHaveURL(new RegExp(`${CustomerAccountPage.PATH}\\?id=\\d+`));
-    await expect(account.heading).toHaveText(name);
+    // The account view can take ~20s to mount after a currency change.
+    await expect(account.heading).toHaveText(name, { timeout: 45000 });
     await expect(account.customerId).toContainText(/ID:\s*\d+/);
     await expect(account.customersLink).toHaveAttribute('href', '/customer-value-portal');
   });

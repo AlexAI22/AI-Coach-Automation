@@ -1,5 +1,12 @@
 import path from 'path';
-import { test as base, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import {
+  test as base,
+  expect,
+  type Browser,
+  type BrowserContext,
+  type Page,
+  type TestInfo,
+} from '@playwright/test';
 import { AUTH_FILE, ensureAuthenticated, savedSessionExists } from '../../support/session';
 
 /**
@@ -23,7 +30,9 @@ import { AUTH_FILE, ensureAuthenticated, savedSessionExists } from '../../suppor
  *
  * TRADE-OFF: Playwright's per-test artifacts (trace/video/screenshot on failure)
  * hang off the built-in context fixture, so they are not produced for the shared
- * window. Tracing is off by default anyway — these specs run against a real
+ * window. The automatic `failureArtifacts` fixture below fills the screenshot
+ * gap: every failing test gets a screenshot, the URL and an ARIA snapshot of
+ * each open window attached to its report entry. Tracing is off by default anyway — these specs run against a real
  * staging account in a reused session, and a trace would embed account data. For
  * debugging, set TRACE=on to record ONE trace for the whole run; it contains the
  * login request, so keep it local and delete it afterwards.
@@ -47,9 +56,61 @@ type SharedTestFixtures = {
    * from a clean slate in the same window.
    */
   anonPage: Page;
+  /** Automatic: attaches a screenshot + page state to every failing test. */
+  failureArtifacts: void;
 };
 
 const TRACE_ENABLED = (process.env.TRACE ?? '').toLowerCase() === 'on';
+
+/**
+ * FAILURE_ARTIFACTS=off disables the failure screenshots (default on). They
+ * show staging account data, which is the same data the HTML report's error
+ * messages already hold. Unlike a trace, they contain no login request.
+ */
+const FAILURE_ARTIFACTS_ENABLED = (process.env.FAILURE_ARTIFACTS ?? 'on').toLowerCase() !== 'off';
+
+/**
+ * The windows this worker has opened, by name. failureArtifacts captures
+ * whichever ones exist when a test fails, without asking for them as fixtures:
+ * depending on sharedPage would force a login even for the logged-out specs.
+ * The worker fixtures below register and unregister their pages here.
+ */
+const openWindows = new Map<string, Page>();
+
+/** Caps each capture so a hung page cannot eat the teardown budget. */
+const CAPTURE_TIMEOUT_MS = 10000;
+
+/**
+ * Attaches, for each open window: a viewport screenshot, its URL, and an ARIA
+ * snapshot of the page (a compact text tree of what was on screen; it is
+ * searchable and survives where a screenshot is ambiguous). Every capture is
+ * best-effort: a failure to capture must never replace the test's real error.
+ */
+async function attachFailureArtifacts(testInfo: TestInfo): Promise<void> {
+  for (const [name, page] of openWindows) {
+    if (page.isClosed()) continue;
+    try {
+      await testInfo.attach(`failure-${name}-screenshot`, {
+        body: await page.screenshot({ timeout: CAPTURE_TIMEOUT_MS, animations: 'disabled' }),
+        contentType: 'image/png',
+      });
+    } catch (error) {
+      console.warn(`[fixtures] Could not screenshot the ${name} window: ${(error as Error).message}`);
+    }
+    try {
+      const aria = await page.locator('body').ariaSnapshot({ timeout: CAPTURE_TIMEOUT_MS });
+      await testInfo.attach(`failure-${name}-page-state`, {
+        body: `URL: ${page.url()}\n\n${aria}`,
+        contentType: 'text/plain',
+      });
+    } catch (error) {
+      await testInfo.attach(`failure-${name}-page-state`, {
+        body: `URL: ${page.url()}\n\n(ARIA snapshot unavailable: ${(error as Error).message})`,
+        contentType: 'text/plain',
+      });
+    }
+  }
+}
 
 /**
  * Context options that cannot come from the config's `use` block.
@@ -95,10 +156,12 @@ export const test = base.extend<SharedTestFixtures, SharedWorkerFixtures>({
   sharedPage: [
     async ({ sharedContext }, use) => {
       const page = await sharedContext.newPage();
+      openWindows.set('shared', page);
       // Logs in once per run, in this very window, and only if the saved session
       // is missing or expired.
       await ensureAuthenticated(page);
       await use(page);
+      openWindows.delete('shared');
       // The page goes away with the context above.
     },
     { scope: 'worker' },
@@ -115,7 +178,10 @@ export const test = base.extend<SharedTestFixtures, SharedWorkerFixtures>({
 
   anonWindow: [
     async ({ anonContext }, use) => {
-      await use(await anonContext.newPage());
+      const page = await anonContext.newPage();
+      openWindows.set('anon', page);
+      await use(page);
+      openWindows.delete('anon');
     },
     { scope: 'worker' },
   ],
@@ -137,6 +203,25 @@ export const test = base.extend<SharedTestFixtures, SharedWorkerFixtures>({
     await anonWindow.context().clearCookies();
     anonWindow.removeAllListeners('response');
   },
+
+  /*
+   * Replaces Playwright's `screenshot: 'only-on-failure'`, which hangs off the
+   * built-in per-test context and so never fires for the shared window. It
+   * declares no dependencies, so Playwright sets it up first and tears it down
+   * LAST, after the test body and the `page`/`anonPage` teardowns. The window is
+   * still open then (the worker owns it) and still shows the state at the
+   * failure. Expected failures (test.fail(), see support/knownIssues.ts) count
+   * as passing, so they produce no artifacts.
+   */
+  failureArtifacts: [
+    async ({}, use, testInfo) => {
+      await use();
+      if (FAILURE_ARTIFACTS_ENABLED && testInfo.status !== testInfo.expectedStatus) {
+        await attachFailureArtifacts(testInfo);
+      }
+    },
+    { auto: true },
+  ],
 });
 
 export { expect, AUTH_FILE };

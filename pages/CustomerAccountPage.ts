@@ -21,6 +21,8 @@ export class CustomerAccountPage {
    * reopen itself (see selectCurrency) without the caller passing the id again.
    */
   private openedCustomerId = '0009623781';
+  // Without id_region the deep link bounces to the portal list.
+  private openedRegion: string | undefined;
 
   readonly root: Locator;
   readonly accountTitle: Locator;
@@ -229,6 +231,7 @@ export class CustomerAccountPage {
     if (region) params.set('id_region', region);
     const url = `${CustomerAccountPage.PATH}?${params.toString()}`;
     this.openedCustomerId = id;
+    this.openedRegion = region;
     const portal = new CustomerValuePortalPage(this.page);
     // ensureCustomersLoaded() is slow (it waits out the list endpoint), so it
     // gets ONE shot rather than one per reload — six of them would outlast the
@@ -236,22 +239,29 @@ export class CustomerAccountPage {
     let demoModeRecovered = false;
 
     // The account view also intermittently mounts an empty <main> (hydration/
-    // data race), so reload until the header renders. A short pause between
-    // reloads eases the intermittent staging throttling.
-    for (let attempt = 0; attempt < 6; attempt++) {
+    // data race), so reload until the header renders. Each attempt waits longer:
+    // MEASURED (Nov 2026) the first render after a currency change takes ~20s,
+    // and the old fixed wait reloaded mid-fetch so that render never landed.
+    // (locator.isVisible() ignores its timeout, so waitFor() is used instead.)
+    for (const timeout of [10000, 20000, 30000]) {
       await this.page.goto(url, { waitUntil: 'domcontentloaded' });
       await this.dismissWelcomeDialog();
-      if (await this.heading.isVisible({ timeout: 8000 }).catch(() => false)) {
+      await this.heading
+        .or(portal.heading)
+        .first()
+        .waitFor({ state: 'visible', timeout })
+        .catch(() => {});
+      if (await this.heading.isVisible()) {
         return;
       }
 
       // The portal's h1 renders only on the list page, so it is the signal that
       // the deep link was bounced rather than merely slow.
-      const bounced = await portal.heading.isVisible({ timeout: 5000 }).catch(() => false);
+      const bounced = await portal.heading.isVisible();
       if (bounced && !demoModeRecovered) {
         demoModeRecovered = true;
         // If the portal list itself will not load, no account page can render,
-        // so stop and report that rather than spending five more reloads on it.
+        // so stop and report that rather than spending more reloads on it.
         const loaded = await portal.ensureCustomersLoaded().then(
           () => true,
           () => false,
@@ -464,7 +474,7 @@ export class CustomerAccountPage {
 
       // The remount landed empty — reload and pick again. The selection is not
       // assumed to survive the reload, which is why the loop re-selects.
-      await this.goto(this.openedCustomerId);
+      await this.goto(this.openedCustomerId, this.openedRegion);
     }
 
     await expect(

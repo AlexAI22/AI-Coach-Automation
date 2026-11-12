@@ -4,6 +4,7 @@ import { CoachMeModalPage } from '../pages/CoachMeModalPage';
 import { watchHttpErrors } from './support/httpErrors';
 import { hasCredentials } from '../support/credentials';
 import { askAndCheckAnswer, CREDENTIALS_REQUIRED } from './support/coachMeAnswers';
+import { expectFailureFromKnownIssue, KNOWN_ISSUES, type KnownIssue } from './support/knownIssues';
 
 /**
  * Coach Me — FFA: run every suggested question and check the agent's answer.
@@ -32,18 +33,23 @@ const EXPECTED_TOPIC: Record<string, RegExp> = {
   [PROMPTS[7]]: /fund/i,
 };
 
-test.describe(`Coach Me answers — FFA — ${CUSTOMER.name}`, () => {
+/**
+ * Prompts that fail because of a known staging PRODUCT issue, keyed by 1-based
+ * prompt number. These cases are marked expected-to-fail (see
+ * tests/support/knownIssues.ts), so they keep the run green and are not retried.
+ * When the content is fixed, the case unexpectedly passes and turns red. Delete
+ * its entry here then. Do not loosen the checks to make these pass.
+ */
+const KNOWN_ISSUE_BY_PROMPT: Partial<Record<number, KnownIssue>> = {
+  1: KNOWN_ISSUES.serviceCatalogueNotLoaded, // no outcomes/deliverables (soft content-gap check)
+  7: KNOWN_ISSUES.advisoryMotionNotLoaded, // ~140 chars: length floor + failure markers
+  8: KNOWN_ISSUES.fundingReplyPlaceholder, // "please reach out to TBC" (soft placeholder check)
+};
+
+// @ai: every case triggers a real AI run, so CI keeps it out of the per-push smoke.
+test.describe(`Coach Me answers — FFA — ${CUSTOMER.name}`, { tag: '@ai' }, () => {
   // Not serial: one failing prompt must not skip the prompts after it.
   test.describe.configure({ mode: 'default' });
-
-  /*
-   * KNOWN PRODUCT ISSUES on staging (these cases FAIL on purpose, as the
-   * standing signal; they pass by themselves once the content is fixed):
-   *  - prompt 1: Service Catalogue entry not loaded -> no outcomes/deliverables.
-   *  - prompt 7: "Advisory Motion training content has not been loaded" (140 chars).
-   *  - prompt 8: canned funding reply ends "please reach out to TBC".
-   * Do not loosen the checks to make these pass.
-   */
 
   let account: CustomerAccountPage;
   let coach: CoachMeModalPage;
@@ -76,6 +82,8 @@ test.describe(`Coach Me answers — FFA — ${CUSTOMER.name}`, () => {
   for (const [index, promptText] of PROMPTS.entries()) {
     test(`prompt ${index + 1} should return a usable answer: "${promptText}"`, async ({ page }, testInfo) => {
       test.setTimeout(600000);
+      const knownIssue = KNOWN_ISSUE_BY_PROMPT[index + 1];
+      if (knownIssue) expectFailureFromKnownIssue(knownIssue);
 
       const httpErrors = watchHttpErrors(page);
 

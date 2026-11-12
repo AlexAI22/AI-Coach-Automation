@@ -135,18 +135,55 @@ The Coach Me answer specs share their per-prompt flow and answer checks
 
 ### Test categories and cost
 
-| Category | How to recognise it | Cost |
-|----------|---------------------|------|
-| Read-only UI checks | everything else | seconds per test |
-| AI answer suites | title contains `should return a usable answer` | one real AI run per prompt (≈15 s to 3 min each) |
-| Mutating chat creation | title starts with `should create a` | creates a real chat in the **Automation Project** and runs the agent (minutes each) |
+| Category | Tag | Cost |
+|----------|-----|------|
+| Read-only UI checks | _(none)_ | seconds per test |
+| AI answer suites | `@ai` | one real AI run per prompt (≈15 s to 3 min each) |
+| Mutating chat creation | `@mutating` | creates a real chat in the **Automation Project** and runs the agent (minutes each) |
 
-The titles are what CI uses to pick suites, so keep these naming conventions when adding
-tests. Use `--grep` / `--grep-invert` with the same strings locally, e.g.:
+#### Test tags
+
+CI picks its suites by **tag**, so **tag every new test that triggers AI answers
+(`@ai`) or creates data (`@mutating`)**. An untagged test is treated as a cheap
+read-only check and runs on every push. Tag a whole spec on its `describe`, or a
+single test:
+
+```ts
+test.describe('Coach Me answers — ...', { tag: '@ai' }, () => { /* ... */ });
+test('should create a ... chat', { tag: '@mutating' }, async ({ page }) => { /* ... */ });
+```
+
+Select by tag locally with `--grep` / `--grep-invert`, or use the shortcuts:
 
 ```bash
-npx playwright test --grep-invert "should create a|should return a usable answer"   # smoke
+npm run test:smoke      # no @ai, no @mutating (what every push runs)
+npm run test:nightly    # everything except @mutating
+npm run test:ai         # only @ai
+npx playwright test --list --grep @ai   # see what a tag selects
 ```
+
+#### Known product issues
+
+Tests that fail because of a known **product** bug on staging are marked expected to
+fail, so the run stays green and a new regression stands out. The issues are listed in
+[tests/support/knownIssues.ts](tests/support/knownIssues.ts); the HTML report shows a
+`known issue` annotation on each affected test. Once the bug is fixed, the test
+**passes unexpectedly and turns red**. Delete its marker then. Expected failures are not
+retried.
+
+- `expectFailureFromKnownIssue(issue)`: the whole test is expected to fail. Use it when
+  the test checks only the affected behaviour, e.g. one test per prompt.
+- `expectKnownIssueStillPresent(issue, observed)`: tolerates only the specific symptom
+  and keeps every other check hard. Use it in a test that checks several things, e.g.
+  the Expansion Plan answers test and its known 404.
+
+#### Failure screenshots
+
+The shared window means Playwright's own `screenshot: 'only-on-failure'` never fires, so
+an automatic fixture in [tests/support/fixtures.ts](tests/support/fixtures.ts) attaches
+a **screenshot**, the **URL** and an **ARIA snapshot** (a text tree of the page) of each
+open window to every failing test in the HTML report. Set `FAILURE_ARTIFACTS=off` to
+disable them.
 
 The staging backend is slow and all credentialed tests share one account, so the
 whole suite runs single-worker (`workers: 1`, `fullyParallel: false`). Don't override

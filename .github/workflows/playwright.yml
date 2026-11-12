@@ -120,11 +120,13 @@ jobs:
           # nightly halves the retry budget the fast suites keep.
           RETRIES: ${{ (github.event_name == 'schedule' || github.event.inputs.suite == 'nightly' || github.event.inputs.suite == 'answers') && '1' || '2' }}
         run: |
-          # Every AI-answer case is titled "...should return a usable answer",
-          # and every chat-creation case "should create a ...", so both groups
-          # are selectable by title without a tagging scheme.
-          AI_ANSWERS="should return a usable answer"
-          MUTATING="should create a"
+          # Groups are selected by Playwright TAGS, not by title text, so renaming
+          # a test cannot silently move it into another suite:
+          #   @ai        triggers real AI answer runs (the Coach Me answer suites)
+          #   @mutating  creates real chats on the shared staging account
+          # Tag any new test of either kind; see README "Test tags".
+          AI_ANSWERS="@ai"
+          MUTATING="@mutating"
 
           SUITE="${{ github.event.inputs.suite }}"
           if [ -z "$SUITE" ]; then

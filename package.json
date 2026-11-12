@@ -6,6 +6,9 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
+    "test:smoke": "playwright test --grep-invert \"@ai|@mutating\"",
+    "test:nightly": "playwright test --grep-invert @mutating",
+    "test:ai": "playwright test --grep @ai",
     "test:login": "playwright test login-success.spec.ts",
     "test:login:headed": "playwright test login-success.spec.ts --headed",
     "test:login:secure": "pwsh -NoProfile -File scripts/run-secure.ps1 -Spec login-success.spec.ts",
@@ -49,6 +52,10 @@
     "test:ffa-coach-me-answers": "playwright test tests/coachMeFFAAnswers.spec.ts",
     "test:ffa-coach-me-answers:headed": "playwright test tests/coachMeFFAAnswers.spec.ts --headed",
     "test:ffa-coach-me-answers:secure": "pwsh -NoProfile -File scripts/run-secure.ps1 -Spec tests/coachMeFFAAnswers.spec.ts",
+    "test:opportunities": "pwsh -NoProfile -File scripts/run-opportunities.ps1",
+    "test:opportunities:headed": "pwsh -NoProfile -File scripts/run-opportunities.ps1 -Headed",
+    "test:opportunities:answers": "pwsh -NoProfile -File scripts/run-opportunities.ps1 -Suite answers",
+    "test:opportunities:all": "pwsh -NoProfile -File scripts/run-opportunities.ps1 -Suite all",
     "test:secure": "pwsh -NoProfile -File scripts/run-secure.ps1",
     "report": "playwright show-report",
     "typecheck": "tsc --noEmit -p ."

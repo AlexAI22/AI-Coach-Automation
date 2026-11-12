@@ -7,9 +7,10 @@ import { hasCredentials } from '../support/credentials';
 /**
  * Coach Me — suggested question prompts.
  *
- * Flow under test: Customer Value Portal -> customer account page -> the
- * Opportunities tab -> an opportunity's "Coach Me" button -> the AI Coach modal
- * -> its "Suggested Questions" panel.
+ * Flow under test: Customer Value Portal -> customer account page -> the FFA
+ * tab -> the opportunity card's "Coach Me" button -> the AI Coach modal
+ * -> its "Suggested Questions" panel. (The Opportunities tab lost its Coach Me
+ * buttons in the Nov 2026 redesign; the entry point now lives on the FFA tab.)
  *
  * SCOPE: the prompts themselves — that the panel offers exactly the expected
  * questions, verbatim and in order. No prompt is clicked, so no AI run is
@@ -19,7 +20,7 @@ import { hasCredentials } from '../support/credentials';
  * which is logged in once per run.
  */
 
-const CUSTOMER = { id: '0009626222', name: 'Ballyvesey Industries Ltd' };
+const CUSTOMER = { id: '0009626222', region: 'EMEA', name: 'Ballyvesey Industries Ltd' };
 const OPPORTUNITY = 'Foundation Frontier Assessment';
 const EXPECTED_PROMPTS = CoachMeModalPage.SUGGESTED_QUESTIONS;
 
@@ -27,14 +28,17 @@ const EXPECTED_PROMPTS = CoachMeModalPage.SUGGESTED_QUESTIONS;
 // in the first test — re-opening it per test would mean re-navigating to the
 // account page (which needs several reloads on staging) seven more times.
 //
-// DISABLED on request (it used to be commented out in full). Skipped rather than
-// commented out so it keeps compiling against the page objects; remove `.skip`
-// to re-enable.
-test.describe.skip(`Coach Me prompts — ${CUSTOMER.name} / ${OPPORTUNITY}`, () => {
+// DISABLED by default on request; opt in with `npm run test:opportunities`
+// (sets RUN_OPPORTUNITIES=1).
+test.describe(`Coach Me prompts — ${CUSTOMER.name} / ${OPPORTUNITY}`, () => {
+  test.skip(!process.env.RUN_OPPORTUNITIES, 'Disabled by default; run with npm run test:opportunities');
   test.describe.configure({ mode: 'serial' });
 
   let account: CustomerAccountPage;
   let coach: CoachMeModalPage;
+
+  const coachMeButton = () =>
+    account.ffaCard(OPPORTUNITY).getByRole('button', { name: 'Coach Me', exact: true });
 
   // `sharedPage` is the run's single window (worker-scoped, so usable from
   // beforeAll) — no extra context/window is opened for this block.
@@ -43,8 +47,8 @@ test.describe.skip(`Coach Me prompts — ${CUSTOMER.name} / ${OPPORTUNITY}`, () 
     test.setTimeout(120000); // the account view can need several reloads to mount
     account = new CustomerAccountPage(sharedPage);
     coach = new CoachMeModalPage(sharedPage);
-    await account.goto(CUSTOMER.id);
-    await account.openTab('Opportunities');
+    await account.goto(CUSTOMER.id, CUSTOMER.region);
+    await account.openTab('FFA');
   });
 
   test.beforeEach(() => {
@@ -58,11 +62,11 @@ test.describe.skip(`Coach Me prompts — ${CUSTOMER.name} / ${OPPORTUNITY}`, () 
     const httpErrors = watchHttpErrors(page);
 
     // Precondition: the opportunity is listed with its Coach Me action.
-    const card = account.opportunityCard(OPPORTUNITY);
+    const card = account.ffaCard(OPPORTUNITY);
     await expect(card).toBeVisible({ timeout: 20000 });
-    await expect(card.getByRole('button', { name: 'Coach Me' })).toBeVisible();
+    await expect(coachMeButton()).toBeEnabled();
 
-    await account.openCoachMe(OPPORTUNITY);
+    await coachMeButton().click();
     await coach.waitForOpen();
 
     // The modal is titled for the opportunity it was opened from and is scoped
@@ -126,7 +130,7 @@ test.describe.skip(`Coach Me prompts — ${CUSTOMER.name} / ${OPPORTUNITY}`, () 
 
   test('should display the same prompts after the modal is closed and reopened', async () => {
     await coach.close();
-    await account.openCoachMe(OPPORTUNITY);
+    await coachMeButton().click();
     await coach.waitForOpen();
     await expect(coach.prompts).toHaveText(EXPECTED_PROMPTS);
   });

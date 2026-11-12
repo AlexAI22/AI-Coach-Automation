@@ -56,6 +56,7 @@ Feature: Customer Value Portal
     Then the customer table header should be visible
     And it should show the "Customer" column
     And it should show the "Channel" column
+    And it should show the "Success Motion" column
     And it should show the "MS L12M Licensing Revenue" column
     And it should show the "MS L12M ACR" column
     And it should show the "L12M Invoiced Total" column
